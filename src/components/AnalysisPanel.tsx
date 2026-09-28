@@ -568,10 +568,19 @@ export default function AnalysisPanel({
 
       {/* ⚡ ANALIZA TIMINGU, RADAR CASHOUT & TRENDÓW KURSOWYCH ⚡ */}
       {match && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="space-y-4 min-w-0">
+          {/* 1. Złote Okno Obstawiania - Pełna szerokość banneru informacyjnego */}
           <GoldenTimingPanel match={match} />
-          <CashoutRadarPanel match={match} />
-          <OddsHistoryTrend match={match} onUpdateMatch={onUpdateMatch} />
+          
+          {/* 2. Radar Cashoutu oraz Monitor Trendów STS - Dwie przestronne kolumny obok siebie */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
+            <div className="min-w-0">
+              <CashoutRadarPanel match={match} />
+            </div>
+            <div className="min-w-0">
+              <OddsHistoryTrend match={match} onUpdateMatch={onUpdateMatch} />
+            </div>
+          </div>
         </div>
       )}
 

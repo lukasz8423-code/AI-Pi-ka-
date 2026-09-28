@@ -123,28 +123,28 @@ export function OddsHistoryTrend({ match, onUpdateMatch }: OddsHistoryTrendProps
   const assessment = ocenOptymalneWejscie(match);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-4" id={`odds-trend-panel-${match.id}`}>
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-4 min-w-0" id={`odds-trend-panel-${match.id}`}>
       {/* Nagłówek sekcji */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-850 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-emerald-950/40 border border-emerald-900/40 rounded-lg text-emerald-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-850 pb-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 bg-emerald-950/40 border border-emerald-900/40 rounded-lg text-emerald-400 shrink-0">
             <TrendingUp className="w-4 h-4 animate-pulse" />
           </div>
-          <div>
-            <h3 className="text-sm font-display font-semibold text-slate-100 flex items-center gap-1.5">
-              Monitor Trendów & Jumps (Real-Time)
+          <div className="min-w-0">
+            <h3 className="text-xs font-display font-semibold text-slate-100 truncate">
+              Monitor Trendów STS (Live)
             </h3>
-            <p className="text-[10px] text-slate-400 leading-normal font-sans">
-              Analizuje skoki kursów STS w czasie rzeczywistym od momentu wpisu danych.
+            <p className="text-[10px] text-slate-400 leading-normal font-sans truncate">
+              Skoki kursów STS w czasie rzeczywistym
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleAddSnapshot}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition duration-150 cursor-pointer shadow-md"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition duration-150 cursor-pointer shadow-md"
             title="Dodaj obecny kurs jako punkt odniesienia do analizy trendu"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -155,7 +155,7 @@ export function OddsHistoryTrend({ match, onUpdateMatch }: OddsHistoryTrendProps
             <button
               type="button"
               onClick={handleClearHistory}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs transition duration-150 cursor-pointer"
+              className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs transition duration-150 cursor-pointer"
               title="Resetuj historię kursów do stanu początkowego"
             >
               Resetuj

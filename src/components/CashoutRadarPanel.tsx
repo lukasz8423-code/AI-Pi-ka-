@@ -132,27 +132,27 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
   const holdVsCashoutDiff = cashoutVal - expectedHoldValue;
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-md space-y-3">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-950 border border-emerald-800 text-emerald-400">
+    <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-md space-y-3 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="p-1.5 rounded-lg bg-emerald-950 border border-emerald-800 text-emerald-400 shrink-0">
             <DollarSign className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-xs font-display font-bold text-slate-100 flex items-center gap-1.5">
-              <span>Radar Cashout & Zamrażania Zysku</span>
+          <div className="min-w-0">
+            <h3 className="text-xs font-display font-bold text-slate-100 flex items-center gap-1.5 flex-wrap">
+              <span>Radar Cashout</span>
               <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-400 font-mono">
                 Auto + STS
               </span>
             </h3>
-            <p className="text-[10px] text-slate-400 font-sans">
-              Dynamiczny asystent automatycznie śledzi wzrost Cashoutu lub pozwala sprawdzić ofertę bukmachera.
+            <p className="text-[10px] text-slate-400 font-sans truncate">
+              Dynamiczny asystent wzrostu Cashoutu
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <span className="text-[10px] font-mono text-slate-400 block">Status Kuponu</span>
-          <span className={`text-xs font-bold font-mono ${isCurrentlyWinning ? 'text-emerald-400' : 'text-amber-400'}`}>
+        <div className="text-right shrink-0">
+          <span className="text-[9px] font-mono text-slate-400 block">Status Kuponu</span>
+          <span className={`text-[11px] font-bold font-mono ${isCurrentlyWinning ? 'text-emerald-400' : 'text-amber-400'}`}>
             {isCurrentlyWinning ? 'WYGRYWA 🟢' : 'NIESPRZYJAJĄCY 🟡'}
           </span>
         </div>
@@ -161,13 +161,13 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
       {/* Przycisk: CASHOUT ROŚNIE (STS) */}
       <button
         onClick={() => setShowManualCalc(!showManualCalc)}
-        className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-between shadow-md transition-all border border-emerald-400/30 active:scale-[0.99]"
+        className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-between gap-2 shadow-md transition-all border border-emerald-400/30 active:scale-[0.99] cursor-pointer"
       >
-        <span className="flex items-center gap-1.5">
-          <Flame className="w-4 h-4 text-amber-300 animate-pulse" />
-          <span>Zauważyłeś, że Cashout rośnie na STS? Sprawdź opłacalność!</span>
+        <span className="flex items-center gap-1.5 min-w-0 text-left">
+          <Flame className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
+          <span className="truncate">Cashout rośnie na STS? Sprawdź opłacalność!</span>
         </span>
-        <span className="flex items-center gap-1 text-[11px] bg-black/30 px-2 py-0.5 rounded font-mono">
+        <span className="flex items-center gap-1 text-[11px] bg-black/30 px-2 py-0.5 rounded font-mono shrink-0">
           <Calculator className="w-3.5 h-3.5" />
           {showManualCalc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </span>

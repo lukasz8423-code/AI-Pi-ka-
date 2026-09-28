@@ -189,35 +189,35 @@ export default function MatchList({
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800" id="match-list-container">
       {/* Nagłówek */}
-      <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-2">
+      <div className="p-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
         <div className="min-w-0">
-          <h2 className="text-lg font-display font-semibold text-slate-100 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span className="truncate">Lista meczów</span>
-          </h2>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-xs text-slate-400 font-sans truncate">Mecze na żywo i archiwalne</p>
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-emerald-400 shrink-0" />
+            <h2 className="text-base font-display font-semibold text-slate-100 whitespace-nowrap">
+              Lista meczów
+            </h2>
             {onClearAllMatches && matches.length > 0 && (
               <button
                 type="button"
                 onClick={onClearAllMatches}
-                className="text-[9px] text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 bg-red-950/20 hover:bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded cursor-pointer"
+                className="text-[9px] text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 bg-red-950/20 hover:bg-red-950/40 border border-red-900/30 px-1.5 py-0.5 rounded cursor-pointer shrink-0"
                 title="Usuń wszystkie mecze i wyczyść pamięć podręczną"
               >
                 <Trash2 className="w-2.5 h-2.5" />
-                <span>Wyczyść bazę</span>
+                <span>Wyczyść</span>
               </button>
             )}
           </div>
+          <p className="text-[11px] text-slate-400 font-sans truncate mt-0.5">Mecze na żywo i archiwalne</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition duration-200 shrink-0 shadow-lg shadow-emerald-950/30"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition duration-200 shrink-0 shadow-md cursor-pointer ml-auto sm:ml-0"
           id="btn-add-match-toggle"
           title="Dodaj nowy mecz ręcznie"
         >
-          <Plus className="w-4 h-4" />
-          <span>Dodaj mecz ręcznie</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span>Dodaj mecz</span>
         </button>
       </div>
 

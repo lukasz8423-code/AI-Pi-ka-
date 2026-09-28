@@ -77,11 +77,11 @@ export function GoldenTimingPanel({ match }: GoldenTimingPanelProps) {
   };
 
   return (
-    <div className={`rounded-xl border ${styles.bg} ${styles.accentBorder} p-4 sm:p-5 transition-all duration-300 shadow-md flex flex-col gap-4`} id={`timing-panel-${match.id}`}>
+    <div className={`rounded-xl border ${styles.bg} ${styles.accentBorder} p-4 sm:p-5 transition-all duration-300 shadow-md flex flex-col gap-4 min-w-0`} id={`timing-panel-${match.id}`}>
       {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="relative">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/60 pb-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="relative shrink-0">
             <Clock className={`w-5 h-5 ${styles.iconColor}`} />
             {assessment.status === 'IDEALNY' && (
               <span className="absolute -top-1 -right-1 flex h-2 w-2">
@@ -90,23 +90,23 @@ export function GoldenTimingPanel({ match }: GoldenTimingPanelProps) {
               </span>
             )}
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Złote Okno Obstawiania</h3>
-            <p className="text-[10px] text-slate-500">Analiza optymalnego czasu wejścia (65' - 75' minuty)</p>
+            <p className="text-[10px] text-slate-500 truncate">Analiza optymalnego czasu wejścia (65' - 75' minuty)</p>
           </div>
         </div>
         
-        <span className={`text-[10px] sm:text-xs font-bold uppercase px-3 py-1 rounded-full border tracking-wide select-none ${styles.badge} flex items-center gap-1.5 self-start sm:self-center`}>
+        <span className={`text-[10px] sm:text-xs font-bold uppercase px-3 py-1 rounded-full border tracking-wide select-none ${styles.badge} flex items-center gap-1.5 shrink-0`}>
           {assessment.status === 'IDEALNY' && <Flame className="w-3.5 h-3.5 animate-bounce text-emerald-400" />}
           {assessment.rekomendacja}
         </span>
       </div>
 
       {/* Main Body */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start min-w-0">
         {/* Lewa strona: Komunikat i opis (7 kolumn) */}
-        <div className="md:col-span-8 space-y-2">
-          <div className="flex items-center gap-2">
+        <div className="lg:col-span-7 space-y-2.5 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-400 font-semibold font-sans">Sugerowana akcja:</span>
             <div className="flex items-center gap-1.5">
               <span className={`text-sm font-extrabold ${styles.text} flex items-center gap-1`}>
@@ -115,13 +115,13 @@ export function GoldenTimingPanel({ match }: GoldenTimingPanelProps) {
             </div>
           </div>
           
-          <p className="text-xs text-slate-300 leading-relaxed font-sans pr-1 sm:pr-4">
+          <p className="text-xs text-slate-300 leading-relaxed font-sans pr-1 sm:pr-2 break-words">
             {assessment.opis}
           </p>
         </div>
 
-        {/* Prawa strona: Mini-Wskaźniki (4 kolumny) */}
-        <div className="md:col-span-4 bg-slate-950/50 rounded-xl p-3 border border-slate-800/40 flex flex-col gap-3">
+        {/* Prawa strona: Mini-Wskaźniki (5 kolumn) */}
+        <div className="lg:col-span-5 bg-slate-950/50 rounded-xl p-3 border border-slate-800/40 flex flex-col gap-2.5 min-w-0">
           {/* Szansa Powodzenia */}
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[11px]">
