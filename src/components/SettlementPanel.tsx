@@ -22,7 +22,9 @@ export function SettlementPanel({
   ocenWynikZalecanegoTypu,
   onUpdateMatch,
 }: SettlementPanelProps) {
-  const recommendedTyp = match.typZalecany || (rec ? (rec.outcome === '1' ? 'Gospodarz (1)' : rec.outcome === '2' ? 'Gość (2)' : 'Remis (X)') : '');
+  const recommendedTyp = match.betPlaced
+    ? (match.betPlaced.outcome === '1' ? 'Gospodarz (1)' : match.betPlaced.outcome === '2' ? 'Gość (2)' : 'Remis (X)')
+    : (match.typZalecany || (rec ? (rec.outcome === '1' ? 'Gospodarz (1)' : rec.outcome === '2' ? 'Gość (2)' : 'Remis (X)') : ''));
 
   return (
     <div className="mt-4 pt-4 border-t border-slate-800">

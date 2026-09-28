@@ -43,8 +43,10 @@ export default function StatsHistory({
   }> = [];
 
   chronologicalMatches.forEach(m => {
-    const odd = m.kursZalecany || 1.8;
-    const typ = m.typZalecany || '1';
+    const odd = m.betPlaced?.odd || m.kursZalecany || 1.8;
+    const typ = m.betPlaced?.outcome
+      ? (m.betPlaced.outcome === '1' ? 'Gospodarz (1)' : m.betPlaced.outcome === '2' ? 'Gość (2)' : 'Remis (X)')
+      : (m.typZalecany || '1');
     
     let stake = 100;
     if (m.betPlaced && m.betPlaced.stake) {
