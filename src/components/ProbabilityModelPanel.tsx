@@ -179,20 +179,20 @@ export function ProbabilityModelPanel({
             }}
           ></div>
         </div>
-        <div className="flex justify-between text-[9px] text-slate-500 mt-1 font-mono">
-          <span>◀ {match.gosc} (Goście)</span>
-          <span>Zbalansowane</span>
-          <span>{match.gospodarz} (Gospodarz) ▶</span>
+        <div className="flex justify-between items-center text-[9px] text-slate-400 mt-1 font-mono gap-1">
+          <span className="truncate max-w-[38%] text-left" title={`${match.gosc} (Goście)`}>◀ {match.gosc}</span>
+          <span className="text-[8px] text-slate-500 shrink-0 px-1">0% (Środek)</span>
+          <span className="truncate max-w-[38%] text-right" title={`${match.gospodarz} (Gospodarz)`}>{match.gospodarz} ▶</span>
         </div>
 
         {/* Precyzja strzelecka */}
         <div className="grid grid-cols-2 gap-3 mt-3 pt-2.5 border-t border-slate-900">
-          <div>
-            <div className="flex justify-between text-[9px] mb-1">
-              <span className="text-slate-500 flex items-center gap-1">
-                Celność strzałów ({match.gospodarz})
+          <div className="min-w-0">
+            <div className="flex justify-between text-[9px] mb-1 gap-1">
+              <span className="text-slate-400 truncate flex-1" title={match.gospodarz}>
+                Celność: {match.gospodarz}
               </span>
-              <span className="font-mono text-emerald-400 font-bold">{stats.efficiency1}%</span>
+              <span className="font-mono text-emerald-400 font-bold shrink-0">{stats.efficiency1}%</span>
             </div>
             <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
               <div 
@@ -201,12 +201,12 @@ export function ProbabilityModelPanel({
               ></div>
             </div>
           </div>
-          <div>
-            <div className="flex justify-between text-[9px] mb-1">
-              <span className="text-slate-500 flex items-center gap-1">
-                Celność strzałów ({match.gosc})
+          <div className="min-w-0">
+            <div className="flex justify-between text-[9px] mb-1 gap-1">
+              <span className="text-slate-400 truncate flex-1" title={match.gosc}>
+                Celność: {match.gosc}
               </span>
-              <span className="font-mono text-indigo-400 font-bold">{stats.efficiency2}%</span>
+              <span className="font-mono text-indigo-400 font-bold shrink-0">{stats.efficiency2}%</span>
             </div>
             <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
               <div 

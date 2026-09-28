@@ -584,9 +584,9 @@ export default function AnalysisPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5" id="analysis-workspace-grid">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5" id="analysis-workspace-grid">
         {/* Kolumna lewa: Edycja meczu w czasie rzeczywistym */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="xl:col-span-5 space-y-4 min-w-0">
           <MatchControlsPanel
             match={match}
             isSimulating={isSimulating}
@@ -620,7 +620,7 @@ export default function AnalysisPanel({
         </div>
 
         {/* Kolumna prawa: Matematyka, EV, prompt i analiza */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="xl:col-span-7 space-y-4 min-w-0">
           {probsRaw && fairProbs && stats && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-md space-y-4">
               <ProbabilityModelPanel
@@ -728,25 +728,25 @@ export default function AnalysisPanel({
                       </div>
 
                       {/* Rekomendowany Kierunek i Pewność */}
-                      <div className="md:col-span-7 space-y-3 bg-slate-950/30 p-4 rounded-xl border border-slate-850/40 flex flex-col justify-between">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <span className="block text-[9px] text-slate-500 uppercase tracking-wider mb-1 font-bold">
-                              💎 Matematyczny Valuebet (EV)
+                      <div className="md:col-span-7 space-y-3 bg-slate-950/30 p-3.5 rounded-xl border border-slate-850/40 flex flex-col justify-between min-w-0">
+                        <div className="flex flex-col sm:flex-row gap-2.5">
+                          <div className="flex-1 bg-slate-900/70 p-2.5 rounded-lg border border-slate-800/80 min-w-0">
+                            <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1 font-bold truncate">
+                              💎 Valuebet (EV)
                             </span>
-                            <div className="text-xs font-bold text-white flex items-center gap-1 leading-snug">
+                            <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                               <span className="text-sky-400">[{zalecanyOpis}]</span>
-                              <span className="text-slate-400 text-[9px] font-normal font-mono">
-                                @{currentRecOdd.toFixed(2)} (EV: {currentRecEv >= 0 ? '+' : ''}{(currentRecEv * 100).toFixed(1)}%)
+                              <span className="text-slate-400 text-[10px] font-mono">
+                                @{currentRecOdd.toFixed(2)} ({currentRecEv >= 0 ? '+' : ''}{(currentRecEv * 100).toFixed(1)}%)
                               </span>
                             </div>
                           </div>
 
-                          <div>
-                            <span className="block text-[9px] text-slate-500 uppercase tracking-wider mb-1 font-bold">
-                              📈 Prawdopodobieństwo
+                          <div className="bg-slate-900/70 p-2.5 rounded-lg border border-slate-800/80 shrink-0 sm:min-w-[110px]">
+                            <span className="block text-[9px] text-slate-400 uppercase tracking-wider mb-1 font-bold truncate">
+                              📈 Szansa wg AI
                             </span>
-                            <div className="text-xs font-bold text-emerald-400 leading-snug">
+                            <div className="text-sm font-bold font-mono text-emerald-400">
                               {rec ? (rec.fairProb * 100).toFixed(1) : (match.evZalecane ? 'Obliczanie...' : 'N/A')}%
                             </div>
                           </div>

@@ -247,12 +247,15 @@ export function MatchControlsPanel({
         </div>
 
         {/* Przełącznik: Kursy LIVE */}
-        <div className="flex items-center justify-between bg-slate-950/40 p-2.5 px-3.5 rounded-lg border border-slate-800/60 text-xs">
-          <span className="text-slate-300 font-medium flex items-center gap-1.5">
-            <span className={`inline-block w-2 h-2 rounded-full ${match.isLiveOdds ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`}></span>
-            Wprowadzone kursy to: <strong className={match.isLiveOdds ? "text-red-400" : "text-sky-400"}>{match.isLiveOdds ? "Kursy LIVE na żywo" : "Kursy Przedmeczowe"}</strong>
+        <div className="flex items-center justify-between bg-slate-950/40 p-2.5 px-3 rounded-lg border border-slate-800/60 text-xs">
+          <span className="text-slate-300 font-medium flex items-center gap-1.5 min-w-0">
+            <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${match.isLiveOdds ? 'bg-red-500 animate-pulse' : 'bg-slate-500'}`}></span>
+            <span className="text-slate-400">Tryb kursów:</span>
+            <strong className={`truncate ${match.isLiveOdds ? "text-red-400" : "text-sky-400"}`}>
+              {match.isLiveOdds ? "LIVE (na żywo)" : "Przedmeczowe"}
+            </strong>
           </span>
-          <label className="relative inline-flex items-center cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-2">
             <input 
               type="checkbox" 
               checked={!!match.isLiveOdds} 
@@ -266,9 +269,9 @@ export function MatchControlsPanel({
         {/* Statystyki Strzałów */}
         <div>
           <div className="flex justify-between items-center text-xs mb-1.5">
-            <span className="text-slate-400 font-medium">Liczba strzałów (Home / Away):</span>
+            <span className="text-slate-400 font-medium">Liczba strzałów (Gosp. / Goście):</span>
             <span className="font-mono font-bold text-slate-300">
-              {match.strzaly1 !== undefined ? match.strzaly1 : 'brak danych'} : {match.strzaly2 !== undefined ? match.strzaly2 : 'brak danych'}
+              {match.strzaly1 !== undefined ? match.strzaly1 : '-'} : {match.strzaly2 !== undefined ? match.strzaly2 : '-'}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -285,7 +288,7 @@ export function MatchControlsPanel({
                 type="text"
                 inputMode="numeric"
                 id="input-strzaly1"
-                placeholder="brak danych"
+                placeholder="-"
                 value={localStrzaly1}
                 onChange={(e) => handleStrzaly1Change(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 text-xs rounded p-1.5 text-center text-slate-100 outline-none placeholder-slate-700 focus:border-emerald-500 font-mono"
@@ -312,7 +315,7 @@ export function MatchControlsPanel({
                 type="text"
                 inputMode="numeric"
                 id="input-strzaly2"
-                placeholder="brak danych"
+                placeholder="-"
                 value={localStrzaly2}
                 onChange={(e) => handleStrzaly2Change(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 text-xs rounded p-1.5 text-center text-slate-100 outline-none placeholder-slate-700 focus:border-emerald-500 font-mono"

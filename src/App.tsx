@@ -503,9 +503,9 @@ export default function App() {
         />
 
         {/* Sekcja: Sidebar meczów + Panel Roboczy */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Kolumna Lewa: Lista meczów i sterowanie listą */}
-          <div className="lg:col-span-4 min-w-0 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg h-[520px] sm:h-[600px] lg:h-[800px] lg:sticky lg:top-[85px] flex flex-col">
+          <div className="lg:col-span-4 xl:col-span-3 min-w-0 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg h-[520px] sm:h-[600px] lg:h-[800px] lg:sticky lg:top-[85px] flex flex-col">
             <MatchList
               matches={matches}
               apiFetchedMatches={apiFetchedMatches}
@@ -529,7 +529,7 @@ export default function App() {
           </div>
  
           {/* Kolumna Prawa: Formularz kontroli, rozkład matematyczny i analizy AI */}
-          <div className="lg:col-span-8 min-w-0 space-y-6">
+          <div className="lg:col-span-8 xl:col-span-9 min-w-0 space-y-6">
             {selectedMatch ? (
               <div key={selectedMatch.id} className="space-y-6 animate-fadeIn">
                 {/* 1. Panel Analizy Probabilistycznej i Kursów */}

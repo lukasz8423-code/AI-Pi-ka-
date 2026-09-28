@@ -602,12 +602,25 @@ export default function MatchList({
                           </div>
                         </div>
 
-                        <div className="flex justify-between items-center my-1.5">
-                          <div className="text-xs font-semibold truncate text-slate-100 max-w-[110px]">{m.gospodarz}</div>
-                          <div className="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-[11px] font-mono font-bold text-amber-400 mx-2 flex flex-col items-center justify-center min-w-[45px]">
-                            <span>{m.gole1} : {m.gole2}</span>
+                        <div className="bg-slate-950/70 rounded-lg p-2 border border-slate-850/80 my-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                              <span className="text-xs font-semibold text-slate-100 truncate" title={m.gospodarz}>{m.gospodarz}</span>
+                            </div>
+                            <span className="font-mono font-bold text-amber-400 text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 min-w-[24px] text-center shrink-0">
+                              {m.gole1}
+                            </span>
                           </div>
-                          <div className="text-xs font-semibold truncate text-slate-100 max-w-[110px] text-right">{m.gosc}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                              <span className="text-xs font-semibold text-slate-100 truncate" title={m.gosc}>{m.gosc}</span>
+                            </div>
+                            <span className="font-mono font-bold text-amber-400 text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 min-w-[24px] text-center shrink-0">
+                              {m.gole2}
+                            </span>
+                          </div>
                         </div>
 
                         {m.daneSzacunkowe && (
@@ -760,20 +773,25 @@ export default function MatchList({
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center my-1.5">
-                      <div className="text-sm font-semibold truncate text-slate-100 max-w-[130px]">{m.gospodarz}</div>
-                      <div className="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-xs font-mono font-bold text-emerald-400 mx-2 flex flex-col items-center justify-center min-w-[50px]">
-                        <span>{m.gole1} : {m.gole2}</span>
-                        {(() => {
-                           const { sugerowaneGole1, sugerowaneGole2 } = obliczSugerowanyWynikMatematycznie(
-                             m.gole1,
-                             m.gole2,
-                             m.typZalecany
-                           );
-                           return <span className="text-[9px] text-slate-500 font-normal">({sugerowaneGole1}:{sugerowaneGole2})</span>;
-                        })()}
+                    <div className="bg-slate-950/70 rounded-lg p-2.5 border border-slate-850/80 my-2 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                          <span className="text-xs font-semibold text-slate-100 truncate" title={m.gospodarz}>{m.gospodarz}</span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-400 text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 min-w-[24px] text-center shrink-0">
+                          {m.gole1}
+                        </span>
                       </div>
-                      <div className="text-sm font-semibold truncate text-slate-100 max-w-[130px] text-right">{m.gosc}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>
+                          <span className="text-xs font-semibold text-slate-100 truncate" title={m.gosc}>{m.gosc}</span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-400 text-xs px-2 py-0.5 rounded bg-slate-900 border border-slate-800 min-w-[24px] text-center shrink-0">
+                          {m.gole2}
+                        </span>
+                      </div>
                     </div>
 
                     {m.daneSzacunkowe && (
