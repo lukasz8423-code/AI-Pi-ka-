@@ -2,6 +2,8 @@
  * Typy danych dla asystenta zakładów na żywo
  */
 
+export type DataQualityTier = 'TIER_A_DEEP' | 'TIER_B_SEARCH' | 'TIER_C_SYNTHETIC';
+
 export interface LiveMatch {
   id: string;
   gospodarz: string; // Home team
@@ -16,6 +18,12 @@ export interface LiveMatch {
   strzaly2?: number; // Optional manual Away shots
   strzalyCelne1?: number; // Optional manual Home shots on target
   strzalyCelne2?: number; // Optional manual Away shots on target
+  rzutyRozne1?: number;   // Optional Home corners
+  rzutyRozne2?: number;   // Optional Away corners
+  posiadaniePilki1?: number; // Optional Home possession (%)
+  posiadaniePilki2?: number; // Optional Away possession (%)
+  xG1?: number;              // Optional Home expected goals
+  xG2?: number;              // Optional Away expected goals
   czerwoneKartki1?: number; // Optional Home red cards (0, 1, 2...)
   czerwoneKartki2?: number; // Optional Away red cards (0, 1, 2...)
   zolteKartki1?: number;    // Optional Home yellow cards (0, 1, 2...)
@@ -32,6 +40,9 @@ export interface LiveMatch {
   isLocked?: boolean;
   isLiveOdds?: boolean;
   daneSzacunkowe?: boolean;
+  dataQuality?: DataQualityTier;
+  confidenceDiscount?: number;
+  sourceName?: string;
   startingPreMatchProbs?: {
     p1: number;
     px: number;

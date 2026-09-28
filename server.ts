@@ -3,6 +3,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import rateLimit from "express-rate-limit";
+import { MatchHydrationEngine } from "./src/utils/matchHydrationEngine.js";
 
 // Funkcja pomocnicza do dynamicznego wyliczania kursów w zależności od aktualnego wyniku live
 function calculateOdds(gole1: number, gole2: number) {
@@ -110,6 +111,36 @@ async function startServer() {
       res.status(500).json({ 
         error: error.message || "Wystąpił nieoczekiwany błąd podczas komunikacji z modelem AI." 
       });
+    }
+  });
+
+  // Silnik kaskadowego wzbogacania statystyk live (Multi-source Fallback: Plan A / B / C)
+  const hydrationEngine = new MatchHydrationEngine();
+
+  app.post("/api/hydrate-match", async (req, res) => {
+    try {
+      const { gospodarz, gosc, minuta, gole1, gole2, kurs1, kurs_x, kurs2 } = req.body;
+      if (!gospodarz || !gosc) {
+        return res.status(400).json({ error: "Brak wymaganych nazw drużyn." });
+      }
+
+      const hydrated = await hydrationEngine.hydrateMatch({
+        gospodarz: String(gospodarz),
+        gosc: String(gosc),
+        minuta: Number(minuta) || 1,
+        gole1: Number(gole1) || 0,
+        gole2: Number(gole2) || 0,
+        kurs1: Number(kurs1) || 2.0,
+        kurs_x: Number(kurs_x) || 3.0,
+        kurs2: Number(kurs2) || 3.0,
+      });
+
+      res.json(hydrated);
+    } catch (err: any) {
+      console.error("Błąd silnika hydratacji:", err);
+      // Gwarancja braku błędu 500: bezpieczny fallback do Planu C
+      const fallback = hydrationEngine.generatePlanC_SyntheticInference(req.body);
+      res.json(fallback);
     }
   });
 

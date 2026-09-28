@@ -12,7 +12,7 @@ import {
   obliczStawke
 } from '../utils/bettingCalc';
 import { 
-  Compass, Activity, Settings, Plus
+  Compass, Activity, Settings, Plus, RefreshCw, Database
 } from 'lucide-react';
 import { MatchControlsPanel } from './MatchControlsPanel';
 import { ProbabilityModelPanel } from './ProbabilityModelPanel';
@@ -139,10 +139,10 @@ export default function AnalysisPanel({
         console.error("Error calculating balance in getSuggestedStake:", err);
       }
       
-      const suggestedStake = obliczStawke(bankrollSettings.strategy, bankrollSettings.parameter, balance, odd, ev);
+      const suggestedStake = obliczStawke(bankrollSettings.strategy, bankrollSettings.parameter, balance, odd, ev, match?.confidenceDiscount);
       return { stake: suggestedStake, balance: Math.round(balance * 100) / 100 };
     };
-  }, [match?.id, bankrollSettings, matches]);
+  }, [match?.id, match?.confidenceDiscount, bankrollSettings, matches]);
 
   // Obliczenia na żywo na podstawie aktualnego stanu wybranego meczu (zabezpieczone przed null i optymalizowane przez useMemo)
   const probsRaw = useMemo(() => {
@@ -346,6 +346,55 @@ export default function AnalysisPanel({
 
   // Symulacja telemetryczna Live przy użyciu dedykowanego hooka
   const { isSimulating, setIsSimulating, simLog } = useMatchSimulation(match, onUpdateMatch);
+
+  // Stan wzbogacania danych przez silnik Multi-Source Fallback
+  const [isHydrating, setIsHydrating] = useState(false);
+
+  const handleHydrateStats = async () => {
+    if (!match) return;
+    setIsHydrating(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+      const res = await fetch(`${baseUrl}/api/hydrate-match`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gospodarz: match.gospodarz,
+          gosc: match.gosc,
+          minuta: match.minuta,
+          gole1: match.gole1,
+          gole2: match.gole2,
+          kurs1: match.kurs1,
+          kurs_x: match.kurs_x,
+          kurs2: match.kurs2,
+        })
+      });
+      if (!res.ok) throw new Error("HTTP error " + res.status);
+      const hydrated = await res.json();
+      onUpdateMatch({
+        ...match,
+        strzaly1: hydrated.strzaly1,
+        strzaly2: hydrated.strzaly2,
+        strzalyCelne1: hydrated.strzalyCelne1,
+        strzalyCelne2: hydrated.strzalyCelne2,
+        rzutyRozne1: hydrated.rzutyRozne1,
+        rzutyRozne2: hydrated.rzutyRozne2,
+        zolteKartki1: hydrated.zolteKartki1,
+        zolteKartki2: hydrated.zolteKartki2,
+        posiadaniePilki1: hydrated.posiadaniePilki1,
+        posiadaniePilki2: hydrated.posiadaniePilki2,
+        xG1: hydrated.xG1,
+        xG2: hydrated.xG2,
+        dataQuality: hydrated.dataQuality,
+        confidenceDiscount: hydrated.confidenceDiscount,
+        sourceName: hydrated.sourceName
+      });
+    } catch (e) {
+      console.error("Błąd pobierania danych z silnika hydratacji:", e);
+    } finally {
+      setIsHydrating(false);
+    }
+  };
 
   // Obsługa kopiowania do schowka
   const handleCopy = () => {
@@ -556,6 +605,37 @@ export default function AnalysisPanel({
         
         {/* Wizualne wskaźniki stanu i źródła danych */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Poziom jakości danych (Multi-Source Fallback) */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-sans border bg-slate-950/80 border-slate-800">
+            {match.dataQuality === 'TIER_A_DEEP' ? (
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Jakość: <strong>Plan A (Live API / xG)</strong></span>
+              </span>
+            ) : match.dataQuality === 'TIER_B_SEARCH' ? (
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Jakość: <strong>Plan B (Web Ticker)</strong></span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-sky-400">
+                <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+                <span>Jakość: <strong>Plan C (Model STS)</strong></span>
+              </span>
+            )}
+          </div>
+
+          {/* Przycisk kaskadowego wzbogacania statystyk (Multi-Source Fallback) */}
+          <button
+            onClick={handleHydrateStats}
+            disabled={isHydrating}
+            className="flex items-center gap-1.5 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/50 hover:border-indigo-500 text-indigo-300 hover:text-indigo-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+            title="Uruchom silnik kaskadowego pobierania i inferencji statystyk live"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isHydrating ? 'animate-spin' : ''}`} />
+            <span>{isHydrating ? 'Pobieranie...' : 'Wzbogać dane'}</span>
+          </button>
+
           {/* Ostatnia aktualizacja API */}
           <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>

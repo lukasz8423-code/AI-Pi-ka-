@@ -8,7 +8,8 @@ export function obliczStawke(
   parameter: number,
   balance: number,
   odd: number,
-  ev: number
+  ev: number,
+  confidenceDiscount?: number
 ): number {
   if (balance <= 0) return 0;
 
@@ -33,6 +34,11 @@ export function obliczStawke(
     if (stawka <= 0) {
       return 0;
     }
+  }
+
+  // Zastosowanie wskaźnika pewności danych (Multi-source Fallback Discount)
+  if (confidenceDiscount !== undefined && confidenceDiscount > 0 && confidenceDiscount <= 1) {
+    stawka = stawka * confidenceDiscount;
   }
 
   // Sztywny bufor bezpieczeństwa (Safety Cap): maksymalnie 10% bieżącego bankrollu na pojedynczy zakład
