@@ -31,19 +31,22 @@ async function startServer() {
 
   app.set("trust proxy", 1);
 
-  // Opcjonalna obsługa CORS ograniczona do ALLOWED_ORIGIN (jeśli skonfigurowano)
-  const allowedOrigin = process.env.ALLOWED_ORIGIN;
-  if (allowedOrigin) {
-    app.use((req, res, next) => {
-      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization");
-      if (req.method === "OPTIONS") {
-        return res.sendStatus(204);
-      }
-      next();
-    });
-  }
+  // Uniwersalna obsługa CORS i preflight OPTIONS dla wszystkich zapytań
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization, x-auth-token, x-gemini-key, x-goog-api-key, X-Requested-With, Accept");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
+  // Obsługa Favicon bez błędów 404
+  app.get(["/favicon.ico", "/favicon.svg"], (req, res) => {
+    const iconPath = path.join(process.cwd(), "public", "favicon.svg");
+    res.type("image/svg+xml").sendFile(iconPath);
+  });
 
   // Obsługa JSON w żądaniach z limitem 50kb
   app.use(express.json({ limit: "50kb" }));
@@ -66,7 +69,13 @@ async function startServer() {
   });
 
   // API do analizy meczu przy użyciu Gemini AI
-  app.post("/api/analyze", analyzeLimiter, async (req, res) => {
+  app.all(["/api/analyze", "/api/analyze/"], analyzeLimiter, async (req, res) => {
+    if (req.method === "GET") {
+      return res.json({ status: "ready", service: "Gemini Match Analyzer" });
+    }
+    if (req.method !== "POST") {
+      return res.status(200).json({ status: "ok" });
+    }
     try {
       const { prompt } = req.body;
       if (typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -118,7 +127,13 @@ async function startServer() {
   // Silnik kaskadowego wzbogacania statystyk live (Multi-source Fallback: Plan A / B / C)
   const hydrationEngine = new MatchHydrationEngine();
 
-  app.post("/api/hydrate-match", async (req, res) => {
+  app.all(["/api/hydrate-match", "/api/hydrate-match/"], async (req, res) => {
+    if (req.method === "GET") {
+      return res.json({ status: "ready", service: "Match Hydration Engine" });
+    }
+    if (req.method !== "POST") {
+      return res.status(200).json({ status: "ok" });
+    }
     try {
       const { gospodarz, gosc, minuta, gole1, gole2, kurs1, kurs_x, kurs2 } = req.body;
       if (!gospodarz || !gosc) {
