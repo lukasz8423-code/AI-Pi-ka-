@@ -18,8 +18,9 @@ export const AppTopHeader: React.FC<AppTopHeaderProps> = ({
   onOpenNotifications,
   onOpenProfile,
   isApiActive,
-  activeNotificationsCount = 3,
+  activeNotificationsCount = 0,
 }) => {
+
   return (
     <header className="h-16 bg-[#090f17] border-b border-slate-850 px-4 sm:px-6 flex items-center justify-between gap-4 select-none relative z-30">
       {/* Tytuł Dashboardu */}
@@ -78,11 +79,12 @@ export const AppTopHeader: React.FC<AppTopHeaderProps> = ({
           {activeNotificationsCount > 0 && (
             <span
               onClick={onOpenNotifications}
-              className="absolute top-1 right-1 w-4 h-4 bg-rose-500 hover:bg-rose-400 text-white font-mono font-bold text-[9px] rounded-full flex items-center justify-center ring-2 ring-[#090f17] cursor-pointer"
+              className="absolute top-0.5 right-0.5 min-w-[17px] h-[17px] px-1 bg-rose-500 hover:bg-rose-400 text-white font-mono font-bold text-[9px] rounded-full flex items-center justify-center ring-2 ring-[#090f17] cursor-pointer shadow-md animate-pulse"
             >
-              {activeNotificationsCount}
+              {activeNotificationsCount > 99 ? '99+' : activeNotificationsCount}
             </span>
           )}
+
         </div>
 
         {/* Profil typera: Avatar + Rasador Boort + Balans */}

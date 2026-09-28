@@ -1,14 +1,7 @@
 import React from 'react';
 import { LiveMatch } from '../types';
 import { Bell, Flame, Sparkles, ShieldAlert, AlertTriangle, ChevronRight, X, Volume2, VolumeX, CheckCircle2 } from 'lucide-react';
-import { 
-  przelicz_prawdopodobienstwa, 
-  wygladz_prawdopodobienstwa, 
-  oblicz_wartosci_zakladow, 
-  uzyskaj_pre_match_proby,
-  ocenOptymalneWejscie,
-  wykryjEksplozjeKartek
-} from '../utils/bettingCalc';
+import { generateMatchAlerts, AlertNotificationItem } from '../utils/notificationUtils';
 
 interface NotificationCenterModalProps {
   isOpen: boolean;
@@ -29,85 +22,9 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
   if (!isOpen) return null;
 
-  // Wyliczanie alertów w czasie rzeczywistym
-  const alerts: Array<{
-    id: string;
-    matchId: string;
-    matchName: string;
-    type: string;
-    severity: 'success' | 'warning' | 'info' | 'danger';
-    title: string;
-    description: string;
-    time: string;
-    odd?: number;
-  }> = [];
+  // Wyliczanie alertów w czasie rzeczywistym z aktualnego stanu meczów
+  const alerts: AlertNotificationItem[] = generateMatchAlerts(matches);
 
-  matches.forEach(m => {
-    if (m.status === 'wygrany' || m.status === 'przegrany' || m.status === 'anulowany') return;
-
-    try {
-      const preProbs = uzyskaj_pre_match_proby(m);
-      const fairProbs = wygladz_prawdopodobienstwa(
-        m.gospodarz,
-        m.gosc,
-        m.gole1,
-        m.gole2,
-        m.minuta,
-        preProbs.p1,
-        preProbs.px,
-        preProbs.p2
-      );
-      const evBets = oblicz_wartosci_zakladow(m.kurs1, m.kurs_x, m.kurs2, fairProbs.p1, fairProbs.px, fairProbs.p2);
-
-      // Value bet
-      const bestEv = [...evBets].sort((a, b) => b.ev - a.ev)[0];
-      if (bestEv && bestEv.ev > 8) {
-        alerts.push({
-          id: `ev-${m.id}`,
-          matchId: m.id,
-          matchName: `${m.gospodarz} vs ${m.gosc}`,
-          type: 'value_bet',
-          severity: 'success',
-          title: `Value Bet (+${Math.round(bestEv.ev)}% EV)`,
-          description: `Zalecany typ: ${bestEv.name} @${bestEv.odd.toFixed(2)} (Fair: ${(1/bestEv.fairProb).toFixed(2)})`,
-          time: `${m.minuta}'`,
-          odd: bestEv.odd
-        });
-      }
-
-      // Golden Timing
-      const timing = ocenOptymalneWejscie(m);
-      if (timing.status === 'IDEALNY') {
-        alerts.push({
-          id: `timing-${m.id}`,
-          matchId: m.id,
-          matchName: `${m.gospodarz} vs ${m.gosc}`,
-          type: 'golden_timing',
-          severity: 'warning',
-          title: `Złote Okno Obstawiania (${timing.szansaProcent}% szans)`,
-          description: `Typ: ${timing.typSugerowany}. Idealny moment na wejście w końcówkę spotkania.`,
-          time: `${m.minuta}'`
-        });
-      }
-
-      // Eksplozja kartek
-      const cards = wykryjEksplozjeKartek(m);
-      if (cards.isExplosion) {
-        alerts.push({
-          id: `cards-${m.id}`,
-          matchId: m.id,
-          matchName: `${m.gospodarz} vs ${m.gosc}`,
-          type: 'cards',
-          severity: 'danger',
-          title: `Eksplozja Kartek (${cards.strength})`,
-          description: cards.cardOverTip,
-          time: `${m.minuta}'`
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-  });
 
   const playTestSound = () => {
     try {

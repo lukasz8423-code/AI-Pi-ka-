@@ -19,7 +19,9 @@ import { AddMatchModal } from './components/AddMatchModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { fetchRealMatchesSafe, fetchAiAnalysisSafe } from './utils/apiService';
+import { generateMatchAlerts } from './utils/notificationUtils';
 import { Key, X, Plus, ShieldCheck, Sparkles, SlidersHorizontal, BarChart3, Radio, Trash2, RotateCcw } from 'lucide-react';
+
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -237,6 +239,10 @@ export default function App() {
     }
   };
 
+  // Dynamiczne wyliczanie rzeczywistych alertów i powiadomień ze stanu meczów
+  const activeAlerts = useMemo(() => generateMatchAlerts(matches), [matches]);
+  const activeNotificationsCount = activeAlerts.length;
+
   return (
     <div className="min-h-screen bg-[#060b11] text-slate-100 flex flex-col lg:flex-row antialiased font-sans">
       {/* 1. WĄSKI PANEL BOCZNY (Lewa kolumna) */}
@@ -257,8 +263,9 @@ export default function App() {
           onOpenNotifications={() => setShowNotificationsModal(true)}
           onOpenProfile={() => setShowProfileModal(true)}
           isApiActive={true}
-          activeNotificationsCount={3}
+          activeNotificationsCount={activeNotificationsCount}
         />
+
 
         {/* Zawartość zależna od wybranej zakładki */}
         <main className="flex-1 p-4 sm:p-6 max-w-[1600px] w-full mx-auto space-y-6">
