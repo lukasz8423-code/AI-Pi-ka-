@@ -14,12 +14,14 @@ interface AppSidebarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   balance: number;
+  onOpenProfile?: () => void;
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({
   currentTab,
   onSelectTab,
   balance,
+  onOpenProfile,
 }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,11 +45,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           </div>
         </div>
 
-        {/* Balance Card */}
-        <div className="bg-[#0e1724] border border-slate-800 rounded-xl p-3.5 shadow-md">
-          <div className="text-[11px] font-medium text-slate-400 mb-1 flex items-center justify-between">
-            <span>Balance</span>
-            <CreditCard className="w-3.5 h-3.5 text-sky-400" />
+        {/* Balance Card - Interactive */}
+        <div
+          onClick={onOpenProfile}
+          className="bg-[#0e1724] hover:bg-[#121f30] border border-slate-800 hover:border-sky-500/50 rounded-xl p-3.5 shadow-md transition-all cursor-pointer group"
+          title="Kliknij, aby zarządzać stanem konta i kapitałem"
+        >
+          <div className="text-[11px] font-medium text-slate-400 group-hover:text-slate-300 mb-1 flex items-center justify-between transition">
+            <span>Balance (Stan konta)</span>
+            <CreditCard className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-lg font-black font-mono text-slate-100 flex items-baseline gap-1">
             {balance.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -15,6 +15,9 @@ import AnalysisPanel from './components/AnalysisPanel';
 import StatsHistory from './components/StatsHistory';
 import AiAnalysisView from './components/AiAnalysisView';
 import IntelligentNotifications from './components/IntelligentNotifications';
+import { AddMatchModal } from './components/AddMatchModal';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { fetchRealMatchesSafe, fetchAiAnalysisSafe } from './utils/apiService';
 import { Key, X, Plus, ShieldCheck, Sparkles, SlidersHorizontal, BarChart3, Radio } from 'lucide-react';
 
@@ -90,7 +93,9 @@ export default function App() {
   const [pinnedMatchIds, setPinnedMatchIds] = useState<string[]>([]);
   const [analyzingMatchId, setAnalyzingMatchId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddMatchModal, setShowAddMatchModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   
   // Real API integration
   const [fetchingReal, setFetchingReal] = useState(false);
@@ -110,6 +115,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
   }, [matches]);
+
+  const handleAddCustomMatch = (newMatch: LiveMatch) => {
+    setMatches(prev => [newMatch, ...prev]);
+    setSelectedMatchId(newMatch.id);
+  };
 
   // Pobranie bieżącego salda
   const currentBalance = useMemo(() => {
@@ -209,6 +219,7 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         balance={currentBalance}
+        onOpenProfile={() => setShowProfileModal(true)}
       />
 
       {/* 2. GŁÓWNA PRZESTRZEŃ APLIKACJI */}
@@ -218,7 +229,10 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenSettings={() => setShowApiModal(true)}
+          onOpenNotifications={() => setShowNotificationsModal(true)}
+          onOpenProfile={() => setShowProfileModal(true)}
           isApiActive={true}
+          activeNotificationsCount={3}
         />
 
         {/* Zawartość zależna od wybranej zakładki */}
@@ -245,7 +259,7 @@ export default function App() {
                       <button
                         onClick={() => handleTriggerAiAnalysis(selectedMatch.id)}
                         disabled={analyzingMatchId === selectedMatch.id}
-                        className="flex items-center gap-1.5 bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer disabled:opacity-50"
+                        className="flex items-center gap-1.5 bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer disabled:opacity-50 active:scale-95"
                       >
                         <Sparkles className={`w-3.5 h-3.5 text-sky-400 ${analyzingMatchId === selectedMatch.id ? 'animate-spin' : ''}`} />
                         <span>{analyzingMatchId === selectedMatch.id ? 'Generowanie...' : 'Analiza AI Gemini'}</span>
@@ -288,7 +302,7 @@ export default function App() {
                     onSelectMatch={handleSelectMatch}
                     onFetchRealMatches={handleFetchRealMatches}
                     fetchingReal={fetchingReal}
-                    onOpenAddMatchModal={() => setShowAddForm(true)}
+                    onOpenAddMatchModal={() => setShowAddMatchModal(true)}
                   />
                 </div>
               </div>
@@ -318,7 +332,7 @@ export default function App() {
                 onTriggerAiAnalysis={handleTriggerAiAnalysis}
                 aiLoading={analyzingMatchId === selectedMatch.id}
                 bankrollSettings={bankrollSettings}
-                onOpenAddMatchForm={() => setShowAddForm(true)}
+                onOpenAddMatchForm={() => setShowAddMatchModal(true)}
                 lastFetched={lastFetched}
               />
             </div>
@@ -457,14 +471,21 @@ export default function App() {
 
       {/* Modal konfiguracji klucza API */}
       {showApiModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-[#0b131e] border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+        <div 
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn"
+          onClick={() => setShowApiModal(false)}
+        >
+          <div 
+            className="bg-[#0b131e] border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl relative z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-5 border-b border-slate-800 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
                 <Key className="w-5 h-5 text-amber-500" />
                 Konfiguracja API Meczów Live
               </h3>
               <button
+                type="button"
                 onClick={() => setShowApiModal(false)}
                 className="text-slate-400 hover:text-slate-100 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
               >
@@ -473,12 +494,12 @@ export default function App() {
             </div>
             <div className="p-5 space-y-4">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Wprowadź swój darmowy klucz API (np. z Football-Data.org), aby pobierać mecze z całego świata w czasie rzeczywistym.
+                Wprowadź swój darmowy klucz API (np. z Football-Data.org lub API-Football), aby pobierać mecze z całego świata w czasie rzeczywistym.
               </p>
 
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Klucz API (X-Auth-Token):
+                  Klucz API (X-Auth-Token / X-API-Key):
                 </label>
                 <input
                   type="text"
@@ -501,6 +522,32 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Modal dodawania nowego meczu */}
+      <AddMatchModal
+        isOpen={showAddMatchModal}
+        onClose={() => setShowAddMatchModal(false)}
+        onAddMatch={handleAddCustomMatch}
+      />
+
+      {/* Centrum Powiadomień Live (Dzwonek / Czerwona 3) */}
+      <NotificationCenterModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        matches={matches}
+        onSelectMatch={handleSelectMatch}
+        selectedMatchId={selectedMatchId}
+      />
+
+      {/* Modal profilu typera i zarządzania saldem bankrollu */}
+      <UserProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        bankrollSettings={bankrollSettings}
+        onUpdateBankrollSettings={setBankrollSettings}
+        matches={matches}
+        currentBalance={currentBalance}
+      />
     </div>
   );
 }

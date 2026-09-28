@@ -1,6 +1,6 @@
 import React from 'react';
 import { LiveMatch } from '../types';
-import { SlidersHorizontal, Radio, Download, Star, Lock, Sparkles } from 'lucide-react';
+import { SlidersHorizontal, Radio, Download, Star, Lock, Sparkles, Plus, ChevronRight } from 'lucide-react';
 import { checkHasValuebet } from './MatchList';
 
 interface CompactMatchListViewProps {
@@ -22,21 +22,33 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
   onSelectMatch,
   onFetchRealMatches,
   fetchingReal,
+  onOpenAddMatchModal,
 }) => {
   const liveMatches = matches.filter(m => m.status === 'niesprawdzony' && m.minuta < 90);
   const apiCount = apiFetchedMatches.length;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-      {/* 1. Karta: Filtry */}
+      {/* 1. Karta: Filtry & Dodawanie meczu */}
       <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-4 flex flex-col justify-between shadow-lg">
         <div>
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-              <span>Filtry</span>
+              <span>Filtry & Akcje</span>
             </div>
+
+            {/* Przycisk: Dodaj mecz ręcznie */}
+            <button
+              type="button"
+              onClick={onOpenAddMatchModal}
+              className="flex items-center gap-1 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Dodaj własny mecz ręcznie do analizy live"
+            >
+              <Plus className="w-3 h-3 text-emerald-400" />
+              <span>Dodaj mecz</span>
+            </button>
           </div>
 
           {/* Filtry badge */}
@@ -60,10 +72,10 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
                 <div
                   key={m.id}
                   onClick={() => onSelectMatch(m.id)}
-                  className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border transition-all cursor-pointer group ${
                     isSelected
-                      ? 'bg-slate-900 border-sky-500/70 shadow-md ring-1 ring-sky-500/30'
-                      : 'bg-slate-950/60 border-slate-850 hover:border-slate-700'
+                      ? 'bg-[#121f30] border-sky-500 shadow-md ring-1 ring-sky-500/40'
+                      : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 hover:bg-slate-900/60'
                   }`}
                 >
                   <div className="flex items-center justify-between text-[10px] mb-1">
@@ -77,6 +89,7 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
                         </span>
                       )}
                       {m.isLocked && <Lock className="w-2.5 h-2.5 text-amber-400" />}
+                      <ChevronRight className={`w-3 h-3 text-slate-500 group-hover:text-sky-400 transition ${isSelected ? 'text-sky-400' : ''}`} />
                     </div>
                   </div>
 
@@ -105,9 +118,10 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={onFetchRealMatches}
               disabled={fetchingReal}
-              className="flex items-center gap-1 bg-slate-900 hover:bg-slate-850 border border-slate-750 hover:border-slate-600 text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1 bg-slate-900 hover:bg-slate-850 border border-slate-750 hover:border-slate-600 text-slate-300 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer disabled:opacity-50 active:scale-95"
             >
               <Download className={`w-3 h-3 ${fetchingReal ? 'animate-bounce' : ''}`} />
               <span>{fetchingReal ? 'Pobieranie...' : 'Pobierz API'}</span>
@@ -127,7 +141,7 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
           </div>
 
           {/* Lista kafelków meczów */}
-          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
             {matches.map((m) => {
               const isSelected = m.id === selectedMatchId;
               const isPinned = pinnedMatchIds.includes(m.id);
@@ -137,10 +151,10 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
                 <div
                   key={m.id}
                   onClick={() => onSelectMatch(m.id)}
-                  className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                  className={`p-2 rounded-xl border transition-all cursor-pointer group ${
                     isSelected
-                      ? 'bg-slate-900 border-sky-500/80 shadow-md ring-1 ring-sky-500/30'
-                      : 'bg-slate-950/60 border-slate-850 hover:border-slate-700'
+                      ? 'bg-[#121f30] border-sky-500 shadow-md ring-1 ring-sky-500/40'
+                      : 'bg-slate-950/60 border-slate-850 hover:border-slate-700 hover:bg-slate-900/60'
                   }`}
                 >
                   <div className="flex items-center justify-between text-[10px] mb-1 font-mono">
@@ -155,6 +169,7 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
                         </span>
                       )}
                       <span className="text-slate-400 text-[9px]">@{m.kursZalecany || m.kurs1}</span>
+                      <ChevronRight className={`w-3 h-3 text-slate-600 group-hover:text-sky-400 transition ${isSelected ? 'text-sky-400' : ''}`} />
                     </div>
                   </div>
 
@@ -175,3 +190,4 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
     </div>
   );
 };
+
