@@ -196,77 +196,14 @@ async function startServer() {
         key = ""; // Treat as empty to trigger demo mode fallback
       }
 
-      const demoMatches = [
-        {
-          id: "real-demo-1",
-          gospodarz: "Real Madryt",
-          gosc: "FC Barcelona",
-          gole1: 2,
-          gole2: 1,
-          minuta: 78,
-          kurs1: 1.45,
-          kurs_x: 4.20,
-          kurs2: 6.50,
-          strzaly1: 14,
-          strzaly2: 9,
-          status: "niesprawdzony",
-          dataDodania: new Date().toISOString(),
-          notatki: "Rozgrywki: La Liga (El Clásico) • Tryb Demo"
-        },
-        {
-          id: "real-demo-2",
-          gospodarz: "Manchester City",
-          gosc: "Liverpool FC",
-          gole1: 1,
-          gole2: 1,
-          minuta: 62,
-          kurs1: 2.10,
-          kurs_x: 2.90,
-          kurs2: 3.40,
-          strzaly1: 11,
-          strzaly2: 10,
-          status: "niesprawdzony",
-          dataDodania: new Date().toISOString(),
-          notatki: "Rozgrywki: Premier League • Tryb Demo"
-        },
-        {
-          id: "real-demo-3",
-          gospodarz: "Bayern Monachium",
-          gosc: "Borussia Dortmund",
-          gole1: 3,
-          gole2: 0,
-          minuta: 90,
-          kurs1: 1.02,
-          kurs_x: 18.00,
-          kurs2: 65.00,
-          strzaly1: 21,
-          strzaly2: 5,
-          status: "wygrany",
-          dataDodania: new Date().toISOString(),
-          notatki: "Rozgrywki: Bundesliga • Tryb Demo • Zakończony"
-        },
-        {
-          id: "real-demo-4",
-          gospodarz: "Inter Mediolan",
-          gosc: "AC Milan",
-          gole1: 0,
-          gole2: 0,
-          minuta: 15,
-          kurs1: 2.30,
-          kurs_x: 3.10,
-          kurs2: 3.20,
-          strzaly1: 3,
-          strzaly2: 2,
-          status: "niesprawdzony",
-          dataDodania: new Date().toISOString(),
-          notatki: "Rozgrywki: Serie A (Derby della Madonnina) • Tryb Demo"
-        }
-      ];
-
       if (!key) {
-        console.log("FOOTBALL_API_KEY nie został skonfigurowany. Zwracam mecze demonstracyjne.");
-        return res.json({ matches: demoMatches, isDemo: true });
+        return res.json({ 
+          matches: [], 
+          isDemo: false, 
+          error: "Brak skonfigurowanego klucza API (FOOTBALL_API_KEY lub nagłówka X-Auth-Token). Wprowadź klucz w ustawieniach API." 
+        });
       }
+
 
       // 1. NAJPIERW SPRÓBUJMY FOOTBALL-DATA.ORG
       let footballDataError = null;
@@ -459,14 +396,15 @@ async function startServer() {
         return res.json({ matches: matchesResult });
       }
 
-      // 3. JEŚLI OBYDWA SYSTEMY ZWRÓCIŁY BŁĄD, WRACAMY DO MECHÓW DEMO Z CZYTELNYM RAPORTEM BŁĘDÓW
+      // 3. JEŚLI OBYDWA SYSTEMY ZWRÓCIŁY BŁĄD, ZWRACAMY PUSTĄ LISTĘ Z RAPORTEM BŁĘDÓW
       console.error("Obie integracje (Football-Data i API-Football) zakończyły się niepowodzeniem.");
       
       return res.json({
-        matches: demoMatches,
-        isDemo: true,
+        matches: [],
+        isDemo: false,
         error: `Football-Data.org: "${footballDataError}" | API-Football.com: "${apiSportsError || "Niewłaściwy format klucza lub brak uprawnień"}"`
       });
+
 
     } catch (error: any) {
       console.error("Ogólny błąd endpointu pobierania meczów:", error);

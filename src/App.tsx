@@ -173,14 +173,12 @@ export default function App() {
     });
   };
 
-  const handleRestoreDefaultMatches = () => {
-    setMatches(INITIAL_MATCHES);
-    setSelectedMatchId(INITIAL_MATCHES[0]?.id || null);
-  };
+  const [fetchApiError, setFetchApiError] = useState<string | null>(null);
 
   const handleFetchRealMatches = async () => {
     if (fetchingReal) return;
     setFetchingReal(true);
+    setFetchApiError(null);
     try {
       const result = await fetchRealMatchesSafe(footballApiKey, true);
       if (result.matches && result.matches.length > 0) {
@@ -193,26 +191,23 @@ export default function App() {
           return combined;
         });
 
-        // Jeśli żaden mecz nie był wybrany lub był to stary mock, wybierz pierwszy z pobranych
         if (result.matches[0]) {
-          setSelectedMatchId(prevId => {
-            if (!prevId || prevId === 'montevideo-match-74' || !matches.some(m => m.id === prevId)) {
-              return result.matches[0].id;
-            }
-            return prevId;
-          });
+          setSelectedMatchId(result.matches[0].id);
         }
 
         const timeStr = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastFetched(timeStr);
         localStorage.setItem('asystent_live_bet_last_fetched', timeStr);
+      } else {
+        setFetchApiError(result.error || 'Brak dostępnych meczów z API na ten moment.');
       }
-    } catch (err) {
-      console.warn("Informacja o pobieraniu meczy:", err);
+    } catch (err: any) {
+      setFetchApiError(err.message || 'Błąd podczas pobierania danych z API.');
     } finally {
       setFetchingReal(false);
     }
   };
+
 
   // Całkowicie wyłączony autoload na starcie - dane pobierane wyłącznie na żądanie użytkownika
 
@@ -319,6 +314,12 @@ export default function App() {
                         </p>
                       </div>
 
+                      {fetchApiError && (
+                        <div className="p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-rose-300 text-xs flex items-center justify-center gap-2 max-w-lg mx-auto">
+                          <span>{fetchApiError}</span>
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap justify-center gap-2.5 pt-2">
                         <button
                           onClick={() => setShowAddMatchModal(true)}
@@ -345,15 +346,16 @@ export default function App() {
                           )}
                         </button>
                         <button
-                          onClick={handleRestoreDefaultMatches}
+                          onClick={() => setShowApiModal(true)}
                           className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                         >
-                          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Wczytaj przykładowe</span>
+                          <Key className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Klucz API Football-Data</span>
                         </button>
                       </div>
                     </div>
                   )}
+
 
                 </div>
 
@@ -416,10 +418,10 @@ export default function App() {
                 <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-12 text-center text-slate-400 space-y-3">
                   <p>Wybierz lub dodaj mecz, aby wyświetlić zaawansowane modele matematyczne.</p>
                   <button
-                    onClick={handleRestoreDefaultMatches}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer"
+                    onClick={() => setShowAddMatchModal(true)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
                   >
-                    Przywróć domyślne mecze
+                    Dodaj nowy mecz
                   </button>
                 </div>
               )}
@@ -454,24 +456,17 @@ export default function App() {
                     <span>Dodaj mecz</span>
                   </button>
                   <button
-                    onClick={handleRestoreDefaultMatches}
-                    className="bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1"
-                    title="Przywróć przykładowe mecze"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Przywróć</span>
-                  </button>
-                  <button
                     onClick={handleFetchRealMatches}
                     disabled={fetchingReal}
                     className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
                   >
-                    {fetchingReal ? 'Pobieranie...' : 'Pobierz mecze z API'}
+                    {fetchingReal ? 'Pobieranie...' : 'Pobierz z API'}
                   </button>
                 </div>
               </div>
 
               {matches.length === 0 ? (
+
                 <div className="text-center py-12 text-slate-400">
                   <p className="text-sm">Brak meczów na liście.</p>
                 </div>

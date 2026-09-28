@@ -1,12 +1,11 @@
 import { LiveMatch } from '../types';
-import { INITIAL_MATCHES } from '../data/mockMatches';
 import { uzyskaj_pre_match_proby } from './bettingCalc';
 
 export interface FetchRealMatchesResult {
   matches: LiveMatch[];
   isDemo?: boolean;
   error?: string;
-  source?: 'cache' | 'network' | 'direct_api' | 'fallback';
+  source?: 'cache' | 'network' | 'direct_api' | 'cors_proxy' | 'fallback';
 }
 
 // Pamięć podręczna w locie (In-Memory Cache)
@@ -15,8 +14,8 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-const CACHE_TTL_MS = 30 * 1000; // 30 sekund cache'u
-const COOLDOWN_ON_ERROR_MS = 8 * 1000; // 8 sekund przerwy po błędzie
+const CACHE_TTL_MS = 25 * 1000; // 25 sekund cache'u
+const COOLDOWN_ON_ERROR_MS = 5 * 1000; // 5 sekund przerwy po błędzie
 
 let matchesCache: CacheEntry<FetchRealMatchesResult> | null = null;
 let lastErrorTimestamp = 0;
@@ -112,7 +111,7 @@ export function mapFootballDataToLiveMatch(m: any): LiveMatch {
 }
 
 /**
- * Inteligentny klient zapytań do API Football-Data.org z obsługą X-Auth-Token, proxy i direct fetch
+ * Inteligentny klient zapytań do API Football-Data.org z obsługą X-Auth-Token, CORS Proxy oraz brakiem jakichkolwiek fałszywych mocków
  */
 export async function fetchRealMatchesSafe(apiKey?: string, forceRefresh = false): Promise<FetchRealMatchesResult> {
   const now = Date.now();
@@ -137,36 +136,62 @@ export async function fetchRealMatchesSafe(apiKey?: string, forceRefresh = false
 
   const cleanKey = (apiKey || '').trim().replace(/^["']|["']$/g, '');
 
-  // 3. Próba 1: Wywołanie przez endpoint Proxy w Node.js serwera
+  // 3. Przygotowanie ścieżek zapytań (Serwer Node Proxy oraz publiczne CORS Proxy dla klienta GitHub Pages)
   const envBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
-  const endpointsToTry = [
-    `${envBaseUrl}/api/real-matches`,
-    `/api/real-matches`,
-    `${envBaseUrl}/api/real-matches/`,
-  ].filter((v, i, a) => a.indexOf(v) === i);
+  const rawTargetUrl = 'https://api.football-data.org/v4/matches';
+  const targetWithCompetitions = 'https://api.football-data.org/v4/matches?competitions=WC,CL,BL1,DED,BSA,PD,FL1,ELC,PPL,EC,SA,PL';
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
+  const requestOptions: Array<{ url: string; headers: Record<string, string>; source: 'network' | 'cors_proxy' | 'direct_api' }> = [];
 
+  // Opcja A: Serwerowy Express Proxy (jeśli aplikacja działa w trybie full-stack)
+  if (envBaseUrl) {
+    requestOptions.push({
+      url: `${envBaseUrl}/api/real-matches`,
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(cleanKey ? { 'x-auth-token': cleanKey } : {}) },
+      source: 'network'
+    });
+  }
+  requestOptions.push({
+    url: `/api/real-matches`,
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(cleanKey ? { 'x-auth-token': cleanKey } : {}) },
+    source: 'network'
+  });
+
+  // Opcja B: CORS Proxy dla przeglądarki (omija blokady przeglądarkowe na GitHub Pages)
   if (cleanKey) {
-    headers['x-auth-token'] = cleanKey;
-    headers['X-Auth-Token'] = cleanKey;
-    headers['x-api-key'] = cleanKey;
-    headers['Authorization'] = `Bearer ${cleanKey}`;
+    requestOptions.push({
+      url: `https://corsproxy.io/?url=${encodeURIComponent(rawTargetUrl)}`,
+      headers: { 'X-Auth-Token': cleanKey, 'Accept': 'application/json' },
+      source: 'cors_proxy'
+    });
+    requestOptions.push({
+      url: `https://corsproxy.io/?url=${encodeURIComponent(targetWithCompetitions)}`,
+      headers: { 'X-Auth-Token': cleanKey, 'Accept': 'application/json' },
+      source: 'cors_proxy'
+    });
+    requestOptions.push({
+      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(rawTargetUrl)}`,
+      headers: { 'X-Auth-Token': cleanKey, 'Accept': 'application/json' },
+      source: 'cors_proxy'
+    });
+    // Opcja C: Bezpośrednie wywołanie
+    requestOptions.push({
+      url: rawTargetUrl,
+      headers: { 'X-Auth-Token': cleanKey, 'Accept': 'application/json' },
+      source: 'direct_api'
+    });
   }
 
-  let lastError: Error | null = null;
+  let lastErrorMessage = '';
 
-  for (const endpoint of endpointsToTry) {
+  for (const req of requestOptions) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 7500);
 
-      const response = await fetch(endpoint, {
+      const response = await fetch(req.url, {
         method: 'GET',
-        headers,
+        headers: req.headers,
         signal: controller.signal,
       });
 
@@ -174,122 +199,54 @@ export async function fetchRealMatchesSafe(apiKey?: string, forceRefresh = false
 
       if (response.ok) {
         const json = await response.json();
-        if (json && Array.isArray(json.matches) && json.matches.length > 0) {
+        const matchesArray = json?.matches || (Array.isArray(json) ? json : null);
+
+        if (Array.isArray(matchesArray) && matchesArray.length > 0) {
+          // Mapowanie jeśli otrzymaliśmy surowe dane z Football-Data.org
+          const mappedMatches = matchesArray[0]?.homeTeam 
+            ? matchesArray.map(mapFootballDataToLiveMatch)
+            : matchesArray;
+
           const result: FetchRealMatchesResult = {
-            matches: json.matches,
-            isDemo: Boolean(json.isDemo),
-            error: json.error,
-            source: 'network'
-          };
-          matchesCache = { data: result, timestamp: Date.now() };
-          lastErrorTimestamp = 0;
-          isFetchingInProgress = false;
-          return result;
-        }
-      }
-    } catch (err: any) {
-      lastError = err;
-    }
-  }
-
-  // 4. Próba 2: Bezpośrednie zapytanie asynchroniczne z przeglądarki do https://api.football-data.org/v4/matches
-  if (cleanKey) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const directRes = await fetch('https://api.football-data.org/v4/matches', {
-        method: 'GET',
-        headers: {
-          'X-Auth-Token': cleanKey,
-          'Accept': 'application/json'
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (directRes.ok) {
-        const data = await directRes.json();
-        if (data && Array.isArray(data.matches) && data.matches.length > 0) {
-          const mappedList = data.matches.map(mapFootballDataToLiveMatch);
-          const result: FetchRealMatchesResult = {
-            matches: mappedList,
+            matches: mappedMatches,
             isDemo: false,
-            source: 'direct_api'
+            source: req.source
           };
           matchesCache = { data: result, timestamp: Date.now() };
           lastErrorTimestamp = 0;
           isFetchingInProgress = false;
           return result;
+        } else if (Array.isArray(matchesArray) && matchesArray.length === 0) {
+          lastErrorMessage = 'Brak zaplanowanych meczów w wybranym pakiecie API na dzień dzisiejszy.';
         }
+      } else if (response.status === 403 || response.status === 401) {
+        lastErrorMessage = 'Nieprawidłowy klucz API Football-Data.org lub brak uprawnień do wybranych rozgrywek.';
+      } else if (response.status === 429) {
+        lastErrorMessage = 'Przekroczono limit zapytań do API (Rate Limit 10 req/min). Odczekaj chwilę.';
+      } else if (response.status !== 404) {
+        lastErrorMessage = `Serwer API zwrócił błąd HTTP ${response.status}.`;
       }
     } catch (err: any) {
-      console.warn('[APIService] Direct Football-Data.org fetch warning:', err);
+      if (err.name === 'AbortError') {
+        lastErrorMessage = 'Upłynął limit czasu oczekiwania na odpowiedź API (timeout).';
+      } else {
+        lastErrorMessage = err.message || 'Błąd sieciowy / CORS podczas komunikacji z API.';
+      }
     }
   }
 
   isFetchingInProgress = false;
   lastErrorTimestamp = Date.now();
 
-  // 5. Bezpieczny fallback (tylko realne topowe kluby europejskie)
-  const fallbackResult: FetchRealMatchesResult = {
-    matches: matchesCache?.data?.matches || INITIAL_MATCHES,
-    isDemo: true,
+  // Całkowity brak fałszywych meczów zastępczych - zwracamy pustą listę i czytelny komunikat o błędzie
+  const emptyResult: FetchRealMatchesResult = {
+    matches: [],
+    isDemo: false,
     source: 'fallback',
-    error: lastError?.message || 'Nie udało się pobrać danych z API. Załadowano mecze z bazy.'
+    error: lastErrorMessage || (!cleanKey ? 'Brak wprowadzonego klucza API. Kliknij ikonę klucza w nagłówku, aby dodać token.' : 'Nie udało się pobrać danych z API.')
   };
 
-  return fallbackResult;
-}
-
-/**
- * Bezpieczne wysyłanie promptu analizy do Gemini AI
- */
-export async function fetchAiAnalysisSafe(
-  match: LiveMatch,
-  customGeminiKey?: string
-): Promise<{ analysis?: string; error?: string }> {
-  try {
-    const envBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
-    const endpoint = `${envBaseUrl}/api/analyze`;
-
-    const prompt = `Przeanalizuj taktycznie mecz na żywo pod kątem value betu i Złotego Okna Obstawiania:
-Mecz: ${match.gospodarz} (${match.gole1}) vs (${match.gole2}) ${match.gosc}
-Minuta: ${match.minuta}'
-Kursy STS: 1: ${match.kurs1}, X: ${match.kurs_x}, 2: ${match.kurs2}
-Strzały: ${match.strzaly1 || 0} (celne: ${match.strzalyCelne1 || 0}) vs ${match.strzaly2 || 0} (celne: ${match.strzalyCelne2 || 0})
-Posiadanie piłki: ${match.posiadaniePilki1 || 50}% - ${match.posiadaniePilki2 || 50}%
-Notatki meczowe: ${match.notatki || 'Brak'}
-Określ dominację, ryzyko straty gola oraz optymalny typ na końcówkę spotkania.`;
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (customGeminiKey && customGeminiKey.trim()) {
-      const cleanKey = customGeminiKey.trim().replace(/^["']|["']$/g, '');
-      headers['x-gemini-key'] = cleanKey;
-      headers['x-goog-api-key'] = cleanKey;
-      headers['Authorization'] = `Bearer ${cleanKey}`;
-    }
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ prompt }),
-    });
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      return { error: errJson.error || `Błąd serwera (${res.status})` };
-    }
-
-    const data = await res.json();
-    return { analysis: data.analysis };
-  } catch (err: any) {
-    return { error: err.message || 'Brak połączenia z silnikiem analitycznym AI.' };
-  }
+  return emptyResult;
 }
 
 /**
@@ -371,23 +328,54 @@ export async function fetchStatsForMatch(
     console.warn("Błąd hydratacji:", e);
   }
 
-  // 3. Fallback: generowanie spójnych statystyk
-  return {
-    gospodarz: homeTeam,
-    gosc: awayTeam,
-    gole1: 0,
-    gole2: 0,
-    minuta: 45,
-    kurs1: 2.30,
-    kurs_x: 3.10,
-    kurs2: 2.90,
-    strzaly1: 5,
-    strzaly2: 4,
-    strzalyCelne1: 2,
-    strzalyCelne2: 2,
-    posiadaniePilki1: 50,
-    posiadaniePilki2: 50,
-    notatki: `Statystyki wygenerowane dla: ${homeTeam} vs ${awayTeam}`
-  };
+  return null;
 }
 
+/**
+ * Bezpieczne wysyłanie promptu analizy do Gemini AI
+ */
+export async function fetchAiAnalysisSafe(
+  match: LiveMatch,
+  customGeminiKey?: string
+): Promise<{ analysis?: string; error?: string }> {
+  try {
+    const envBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+    const endpoint = `${envBaseUrl}/api/analyze`;
+
+    const prompt = `Przeanalizuj taktycznie mecz na żywo pod kątem value betu i Złotego Okna Obstawiania:
+Mecz: ${match.gospodarz} (${match.gole1}) vs (${match.gole2}) ${match.gosc}
+Minuta: ${match.minuta}'
+Kursy STS: 1: ${match.kurs1}, X: ${match.kurs_x}, 2: ${match.kurs2}
+Strzały: ${match.strzaly1 || 0} (celne: ${match.strzalyCelne1 || 0}) vs ${match.strzaly2 || 0} (celne: ${match.strzalyCelne2 || 0})
+Posiadanie piłki: ${match.posiadaniePilki1 || 50}% - ${match.posiadaniePilki2 || 50}%
+Notatki meczowe: ${match.notatki || 'Brak'}
+Określ dominację, ryzyko straty gola oraz optymalny typ na końcówkę spotkania.`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (customGeminiKey && customGeminiKey.trim()) {
+      const cleanKey = customGeminiKey.trim().replace(/^["']|["']$/g, '');
+      headers['x-gemini-key'] = cleanKey;
+      headers['x-goog-api-key'] = cleanKey;
+      headers['Authorization'] = `Bearer ${cleanKey}`;
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      return { error: errJson.error || `Błąd serwera (${res.status})` };
+    }
+
+    const data = await res.json();
+    return { analysis: data.analysis };
+  } catch (err: any) {
+    return { error: err.message || 'Brak połączenia z silnikiem analitycznym AI.' };
+  }
+}
