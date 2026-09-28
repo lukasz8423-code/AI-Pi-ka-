@@ -25,22 +25,26 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Wczytywanie stanu meczów z LocalStorage lub mocków
+  // Wczytywanie stanu meczów z LocalStorage lub mocków (oczyszczanie przestarzałych zaślepek)
   const [matches, setMatches] = useState<LiveMatch[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((m: LiveMatch) => {
-            if (!m.startingPreMatchProbs) {
-              return {
-                ...m,
-                startingPreMatchProbs: uzyskaj_pre_match_proby(m)
-              };
-            }
-            return m;
-          });
+          // Usunięcie starych zahardkodowanych zaślepek (np. montevideo)
+          const filtered = parsed.filter((m: LiveMatch) => m.id !== 'montevideo-match-74' && !m.id?.includes('montevideo'));
+          if (filtered.length > 0) {
+            return filtered.map((m: LiveMatch) => {
+              if (!m.startingPreMatchProbs) {
+                return {
+                  ...m,
+                  startingPreMatchProbs: uzyskaj_pre_match_proby(m)
+                };
+              }
+              return m;
+            });
+          }
         }
       } catch (e) {
         console.error("Błąd parsowania meczów z localStorage:", e);
@@ -57,6 +61,7 @@ export default function App() {
       return m;
     });
   });
+
 
   const [bankrollSettings, setBankrollSettings] = useState<BankrollSettings>(() => {
     const defaultBankroll: BankrollSettings = {
@@ -191,11 +196,24 @@ export default function App() {
       if (result.matches && result.matches.length > 0) {
         setApiFetchedMatches(result.matches);
         setMatches(prev => {
-          const ids = new Set(prev.map(m => m.id));
-          const newOnes = result.matches.filter((m: LiveMatch) => !ids.has(m.id));
-          return [...newOnes, ...prev];
+          // Łączymy mecze z API tak, aby nowe realne mecze były na górze listy
+          const apiIds = new Set(result.matches.map(m => m.id));
+          const existingNonApi = prev.filter(m => !apiIds.has(m.id) && m.id !== 'montevideo-match-74');
+          const combined = [...result.matches, ...existingNonApi];
+          return combined;
         });
-        const timeStr = new Date().toLocaleTimeString('pl-PL');
+
+        // Jeśli żaden mecz nie był wybrany lub był to stary mock, wybierz pierwszy z pobranych
+        if (result.matches[0]) {
+          setSelectedMatchId(prevId => {
+            if (!prevId || prevId === 'montevideo-match-74' || !matches.some(m => m.id === prevId)) {
+              return result.matches[0].id;
+            }
+            return prevId;
+          });
+        }
+
+        const timeStr = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastFetched(timeStr);
         localStorage.setItem('asystent_live_bet_last_fetched', timeStr);
       }
@@ -205,6 +223,12 @@ export default function App() {
       setFetchingReal(false);
     }
   };
+
+  // Automatyczne pobranie dzisiejszych realnych meczów przy starcie aplikacji
+  useEffect(() => {
+    handleFetchRealMatches();
+  }, []);
+
 
   const handleTriggerAiAnalysis = async (matchId: string) => {
     const targetMatch = matches.find(m => m.id === matchId);
@@ -591,12 +615,16 @@ export default function App() {
             <div className="p-4 bg-slate-950/60 border-t border-slate-800 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowApiModal(false)}
-                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                onClick={() => {
+                  setShowApiModal(false);
+                  handleFetchRealMatches();
+                }}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-lg shadow-emerald-950/50 flex items-center gap-1.5"
               >
-                Zapisz
+                <span>Zapisz i Pobierz Mecze</span>
               </button>
             </div>
+
           </div>
         </div>
       )}
