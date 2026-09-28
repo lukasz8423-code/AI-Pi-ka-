@@ -1,67 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { LiveMatch, BankrollSettings, OddsHistoryEntry } from './types';
 import { INITIAL_MATCHES } from './data/mockMatches';
-import MatchList, { checkHasValuebet } from './components/MatchList';
-import StatsHistory from './components/StatsHistory';
-import AnalysisPanel from './components/AnalysisPanel';
-import AiAnalysisView from './components/AiAnalysisView';
-import IntelligentNotifications from './components/IntelligentNotifications';
-import { recalculateMatchRecommendation } from './utils/matchRecommendation';
 import { uzyskaj_pre_match_proby } from './utils/bettingCalc';
-import QRCodeDisplay from './components/QRCodeDisplay';
-import { Trophy, Sparkles, Activity, ShieldCheck, Heart, Zap, Key, X, Sun, Moon } from 'lucide-react';
 import { STORAGE_KEY, API_KEY_STORAGE_KEY } from './utils/constants';
 
+import { AppSidebar } from './components/AppSidebar';
+import { AppTopHeader } from './components/AppTopHeader';
+import { LivePitchMap } from './components/LivePitchMap';
+import { MatchPitchStats } from './components/MatchPitchStats';
+import { GoldenBettingHero } from './components/GoldenBettingHero';
+import { CompactMatchListView } from './components/CompactMatchListView';
+
+import AnalysisPanel from './components/AnalysisPanel';
+import StatsHistory from './components/StatsHistory';
+import AiAnalysisView from './components/AiAnalysisView';
+import IntelligentNotifications from './components/IntelligentNotifications';
+import { Key, X, Plus, ShieldCheck, Sparkles, SlidersHorizontal, BarChart3, Radio } from 'lucide-react';
+
 export default function App() {
-  // Stan motywu: ciemny (domyślny) / jasny
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('asystent_live_bet_theme');
-    if (saved === 'light' || saved === 'dark') return saved;
-    return 'dark'; // domyślnie ciemny
-  });
+  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  useEffect(() => {
-    localStorage.setItem('asystent_live_bet_theme', theme);
-    if (theme === 'light') {
-      document.body.classList.add('light-theme');
-    } else {
-      document.body.classList.remove('light-theme');
-    }
-  }, [theme]);
-
-  // Wczytywanie początkowego stanu z LocalStorage lub mocków z automatycznym sprzątaniem
+  // Wczytywanie stanu meczów z LocalStorage lub mocków
   const [matches, setMatches] = useState<LiveMatch[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const now = Date.now();
-          // Usuwamy mecze starsze niż 72h, a te starsze niż 12h na żywo przenosimy do rozliczonych (jako anulowany)
-          const cleaned = parsed
-            .filter((m: any) => {
-              if (!m || typeof m !== 'object') return false;
-              if (!m.dataDodania) return true;
-              const addedTime = new Date(m.dataDodania).getTime();
-              return (now - addedTime) < 72 * 60 * 60 * 1000; // 3 dni max
-            })
-            .map((m: LiveMatch) => {
-              let copy = { ...m };
-              if (copy.status === 'niesprawdzony' && copy.dataDodania) {
-                const addedTime = new Date(copy.dataDodania).getTime();
-                if (now - addedTime > 12 * 60 * 60 * 1000) { // 12 godzin max na żywo
-                  copy = { ...copy, status: 'anulowany' as const };
-                }
-              }
-              if (!copy.startingPreMatchProbs) {
-                copy = {
-                  ...copy,
-                  startingPreMatchProbs: uzyskaj_pre_match_proby(copy)
-                };
-              }
-              return copy;
-            });
-          return cleaned;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((m: LiveMatch) => {
+            if (!m.startingPreMatchProbs) {
+              return {
+                ...m,
+                startingPreMatchProbs: uzyskaj_pre_match_proby(m)
+              };
+            }
+            return m;
+          });
         }
       } catch (e) {
         console.error("Błąd parsowania meczów z localStorage:", e);
@@ -83,61 +58,41 @@ export default function App() {
     const defaultBankroll: BankrollSettings = {
       initial: 1000,
       strategy: 'percent',
-      parameter: 2, // Domyślnie 2% kapitału
+      parameter: 2,
     };
     const saved = localStorage.getItem('asystent_live_bet_bankroll');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          typeof parsed.initial === 'number' &&
-          !isNaN(parsed.initial) &&
-          ['flat', 'percent', 'kelly'].includes(parsed.strategy) &&
-          typeof parsed.parameter === 'number' &&
-          !isNaN(parsed.parameter)
-        ) {
+        if (parsed && typeof parsed === 'object') {
           return {
-            initial: parsed.initial,
-            strategy: parsed.strategy,
-            parameter: parsed.parameter
+            initial: parsed.initial || 1000,
+            strategy: parsed.strategy || 'percent',
+            parameter: parsed.parameter || 2
           };
         }
       } catch (e) {
-        console.error("Błąd parsowania bankrollu z localStorage:", e);
+        console.error("Błąd parsowania bankrollu:", e);
       }
     }
     return defaultBankroll;
   });
 
-  // Zapisywanie bankrollSettings do LocalStorage
   useEffect(() => {
     localStorage.setItem('asystent_live_bet_bankroll', JSON.stringify(bankrollSettings));
   }, [bankrollSettings]);
 
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [pinnedMatchIds, setPinnedMatchIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('asystent_live_bet_pinned');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((id): id is string => typeof id === 'string');
-        }
-      } catch (e) {
-        console.error("Błąd parsowania przypiętych meczów:", e);
-      }
-    }
-    return [];
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(() => {
+    return matches[0]?.id || null;
   });
+
+  const [pinnedMatchIds, setPinnedMatchIds] = useState<string[]>([]);
   const [analyzingMatchId, setAnalyzingMatchId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   
-  // Stany integracji z realnym API i klucz użytkownika
+  // Real API integration
   const [fetchingReal, setFetchingReal] = useState(false);
-  const [fetchError, setFetchError] = useState<{ message: string; code?: string } | null>(null);
   const [apiFetchedMatches, setApiFetchedMatches] = useState<LiveMatch[]>([]);
   const [lastFetched, setLastFetched] = useState<string | null>(() => {
     return localStorage.getItem('asystent_live_bet_last_fetched') || null;
@@ -152,448 +107,370 @@ export default function App() {
   }, [footballApiKey]);
 
   useEffect(() => {
-    localStorage.setItem('asystent_live_bet_pinned', JSON.stringify(pinnedMatchIds));
-  }, [pinnedMatchIds]);
-
-  // Zapisywanie meczów do LocalStorage na każdą zmianę stanu
-  useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(matches));
   }, [matches]);
 
-  // Ustawienie domyślnie wybranego meczu przy starcie
-  useEffect(() => {
-    if (!selectedMatchId && matches.length > 0) {
-      const active = matches.filter(m => m.status === 'niesprawdzony');
-      if (active.length > 0) {
-        setSelectedMatchId(active[0].id);
-      } else {
-        setSelectedMatchId(matches[0].id);
-      }
+  // Pobranie bieżącego salda
+  const currentBalance = useMemo(() => {
+    let bal = bankrollSettings.initial;
+    try {
+      const resolved = matches.filter(m => m.status === 'wygrany' || m.status === 'przegrany');
+      resolved.forEach(m => {
+        const odd = m.kursZalecany || 1.8;
+        const stake = m.betPlaced?.stake ?? 100;
+        if (m.status === 'wygrany') {
+          bal += stake * (odd - 1);
+        } else if (m.status === 'przegrany') {
+          bal -= stake;
+        }
+      });
+    } catch (e) {
+      console.error("Błąd salda:", e);
     }
+    return Math.round(bal * 100) / 100;
+  }, [bankrollSettings.initial, matches]);
+
+  // Aktualnie wybrany mecz
+  const selectedMatch = useMemo(() => {
+    if (!selectedMatchId) return matches[0] || null;
+    return matches.find(m => m.id === selectedMatchId) || matches[0] || null;
   }, [matches, selectedMatchId]);
 
-  // Pobranie aktualnie wybranego obiektu meczu
-  // Wybrany mecz przez kliknięcie użytkownika ma najwyższy priorytet
-  const selectedMatch = matches.find(m => m.id === selectedMatchId) || null;
+  // Filtrowanie meczów przez wyszukiwarkę
+  const filteredMatches = useMemo(() => {
+    if (!searchQuery.trim()) return matches;
+    const q = searchQuery.toLowerCase();
+    return matches.filter(m => 
+      m.gospodarz.toLowerCase().includes(q) || 
+      m.gosc.toLowerCase().includes(q) ||
+      m.notatki?.toLowerCase().includes(q)
+    );
+  }, [matches, searchQuery]);
 
-  // Handlery modyfikacji danych
   const handleSelectMatch = (id: string) => {
     setSelectedMatchId(id);
     setAiError(null);
-    // Jeśli meczu nie ma w głównej liście roboczej (jest tylko w API), dodajmy go
-    if (!matches.some(m => m.id === id)) {
-      const apiMatch = apiFetchedMatches.find(m => m.id === id);
-      if (apiMatch) {
-        setMatches(prev => [apiMatch, ...prev]);
-      }
-    }
-  };
-  
-  const togglePinMatch = (id: string) => {
-    const isPinned = pinnedMatchIds.includes(id);
-    if (!isPinned) {
-      // Przy przypinaniu upewnij się, że mecz jest w głównej liście roboczej
-      if (!matches.some(m => m.id === id)) {
-        const apiMatch = apiFetchedMatches.find(m => m.id === id);
-        if (apiMatch) {
-          setMatches(prev => [apiMatch, ...prev]);
-        }
-      }
-    }
-    setPinnedMatchIds(prev => (prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]));
   };
 
-  const handleAddMatch = (matchData: Omit<LiveMatch, 'id' | 'dataDodania' | 'status'>) => {
-    const initialEntry: OddsHistoryEntry = {
-      minuta: matchData.minuta,
-      kurs1: matchData.kurs1,
-      kurs_x: matchData.kurs_x,
-      kurs2: matchData.kurs2,
-      gole1: matchData.gole1,
-      gole2: matchData.gole2,
-      timestamp: new Date().toISOString()
-    };
-
-    const newMatch: LiveMatch = {
-      ...matchData,
-      id: Math.random().toString(36).substring(2, 11),
-      dataDodania: new Date().toISOString(),
-      status: 'niesprawdzony',
-      oddsHistory: matchData.oddsHistory && matchData.oddsHistory.length > 0 
-        ? matchData.oddsHistory 
-        : [initialEntry]
-    };
-    setMatches(prev => [newMatch, ...prev]);
-    setSelectedMatchId(newMatch.id);
+  const handleUpdateMatch = (updated: LiveMatch) => {
+    setMatches(prev => prev.map(m => m.id === updated.id ? updated : m));
   };
 
-  const handleAddFromApi = (match: LiveMatch) => {
-    const initialEntry: OddsHistoryEntry = {
-      minuta: match.minuta,
-      kurs1: match.kurs1,
-      kurs_x: match.kurs_x,
-      kurs2: match.kurs2,
-      gole1: match.gole1,
-      gole2: match.gole2,
-      timestamp: new Date().toISOString()
-    };
-
-    const matchWithHistory: LiveMatch = {
-      ...match,
-      oddsHistory: match.oddsHistory && match.oddsHistory.length > 0 ? match.oddsHistory : [initialEntry]
-    };
-
-    setMatches(prev => {
-      if (prev.find(m => m.id === match.id)) return prev;
-      return [matchWithHistory, ...prev];
-    });
-    setSelectedMatchId(match.id);
-  };
-
-  const handleUpdateMatch = (updatedMatch: LiveMatch) => {
-    setMatches(prev => prev.map(m => {
-      if (m.id !== updatedMatch.id) return m;
-
-      const minuteChanged = m.minuta !== updatedMatch.minuta;
-      const scoreChanged = m.gole1 !== updatedMatch.gole1 || m.gole2 !== updatedMatch.gole2;
-      const oddsChanged = m.kurs1 !== updatedMatch.kurs1 || m.kurs_x !== updatedMatch.kurs_x || m.kurs2 !== updatedMatch.kurs2;
-
-      let newHistory = updatedMatch.oddsHistory ? [...updatedMatch.oddsHistory] : (m.oddsHistory ? [...m.oddsHistory] : []);
-
-      if (newHistory.length === 0) {
-        newHistory.push({
-          minuta: m.minuta,
-          kurs1: m.kurs1,
-          kurs_x: m.kurs_x,
-          kurs2: m.kurs2,
-          gole1: m.gole1,
-          gole2: m.gole2,
-          timestamp: new Date().toISOString()
-        });
-      } else if (minuteChanged || scoreChanged || oddsChanged) {
-        const lastEntry = newHistory[newHistory.length - 1];
-        // Prosta weryfikacja: jeśli ta sama minuta, nadpisujemy ostatni wpis; jeśli zmieniła się minuta lub wynik, dodajemy nowy wpis.
-        if (lastEntry.minuta === updatedMatch.minuta) {
-          newHistory[newHistory.length - 1] = {
-            minuta: updatedMatch.minuta,
-            kurs1: updatedMatch.kurs1,
-            kurs_x: updatedMatch.kurs_x,
-            kurs2: updatedMatch.kurs2,
-            gole1: updatedMatch.gole1,
-            gole2: updatedMatch.gole2,
-            timestamp: new Date().toISOString()
-          };
-        } else {
-          newHistory.push({
-            minuta: updatedMatch.minuta,
-            kurs1: updatedMatch.kurs1,
-            kurs_x: updatedMatch.kurs_x,
-            kurs2: updatedMatch.kurs2,
-            gole1: updatedMatch.gole1,
-            gole2: updatedMatch.gole2,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
-
-      // Ograniczamy historię kursów do ostatnich 80 wpisów (ochrona pamięci i localStorage)
-      if (newHistory.length > 80) {
-        newHistory = newHistory.slice(-80);
-      }
-
-      return {
-        ...updatedMatch,
-        oddsHistory: newHistory
-      };
-    }));
-  };
-
-  const handleUpdateStatus = (id: string, status: LiveMatch['status']) => {
-    setMatches(prev => prev.map(m => {
-      if (m.id === id) {
-        return {
-          ...m,
-          status,
-          ostatniZapisGoli1: m.gole1,
-          ostatniZapisGoli2: m.gole2
-        };
-      }
-      return m;
-    }));
-  };
-
-  const handleDeleteMatch = (id: string) => {
-    setMatches(prev => prev.filter(m => m.id !== id));
-    if (selectedMatchId === id) {
-      setSelectedMatchId(null);
-    }
-  };
-
-  const handleClearAllMatches = () => {
-    // Zachowaj tylko mecze, które są przypięte (ich ID znajduje się w pinnedMatchIds)
-    setMatches(prev => prev.filter(m => pinnedMatchIds.includes(m.id)));
-    // Jeśli aktualnie wybrany mecz nie jest przypięty (zostanie usunięty), odznacz go
-    if (selectedMatchId && !pinnedMatchIds.includes(selectedMatchId)) {
-      setSelectedMatchId(null);
-    }
-  };
-
-  // Obsługa zapytania do Gemini AI za pośrednictwem serwera Express
-  const handleTriggerAiAnalysis = async (prompt: string) => {
-    if (!selectedMatchId) return;
-    const targetMatchId = selectedMatchId;
-    setAnalyzingMatchId(targetMatchId);
-    setAiError(null);
-    try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-      const response = await fetch(`${baseUrl}/api/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ prompt })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Serwer zwrócił kod błędu podczas analizy.');
-      }
-
-      // Aktualizacja pola aiAnaliza w wybranym meczu
-      setMatches(prev => prev.map(m => {
-        if (m.id === targetMatchId) {
-          return {
-            ...m,
-            aiAnaliza: data.analysis
-          };
-        }
-        return m;
-      }));
-    } catch (err: any) {
-      console.error("AI Analysis integration error:", err);
-      setAiError(err.message || 'Nie udało się połączyć z serwerem analizy Gemini.');
-    } finally {
-      setAnalyzingMatchId(null);
-    }
-  };
-
-  // Funkcja pobierania realnych meczów ze strony football-data.org za pomocą serwera
   const handleFetchRealMatches = async () => {
     setFetchingReal(true);
-    setFetchError(null);
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-      const response = await fetch(`${baseUrl}/api/real-matches`, {
-        headers: {
-          'X-API-Key': footballApiKey
-        }
-      });
-      
-      let data: any;
-      try {
-        data = await response.json();
-      } catch (e) {
-        throw { message: `Błąd serwera: Serwer zwrócił nieprawidłowy format odpowiedzi (status ${response.status}).` };
-      }
-      
-      if (!response.ok) {
-        const errorMsg = data.details 
-          ? `${data.error} - Szczegóły: ${data.details}`
-          : (data.error || 'Nie udało się pobrać prawdziwych meczów.');
-        throw { message: errorMsg, code: data.code };
-      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (footballApiKey) headers['x-auth-token'] = footballApiKey;
 
-      const realMatches: LiveMatch[] = data.matches;
-      if (!realMatches || realMatches.length === 0) {
-        throw { message: 'Brak dostępnych meczów z dzisiejszego dnia w darmowej strefie.' };
-      }
-
-      // Połącz z obecnymi meczami unikając duplikatów po ID
-      setApiFetchedMatches(realMatches);
-
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setLastFetched(timeStr);
-      localStorage.setItem('asystent_live_bet_last_fetched', timeStr);
-
-      // Jeśli to były mecze demonstracyjne, dajemy użytkownikowi informację w stanie
-      if (data.isDemo) {
-        const isKeyProvided = Boolean(footballApiKey && footballApiKey.trim().length > 0);
-        setFetchError({
-          message: isKeyProvided && data.error
-            ? `Błąd zewnętrznych API: ${data.error}`
-            : "Pobrano mecze demonstracyjne (brak klucza FOOTBALL_API_KEY).",
-          code: "DEMO_MODE"
+      const res = await fetch(`${baseUrl}/api/real-matches`, { headers });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const data = await res.json();
+      if (Array.isArray(data.matches) && data.matches.length > 0) {
+        setApiFetchedMatches(data.matches);
+        setMatches(prev => {
+          const ids = new Set(prev.map(m => m.id));
+          const newOnes = data.matches.filter((m: LiveMatch) => !ids.has(m.id));
+          return [...newOnes, ...prev];
         });
+        setLastFetched(new Date().toLocaleTimeString('pl-PL'));
+        localStorage.setItem('asystent_live_bet_last_fetched', new Date().toLocaleTimeString('pl-PL'));
       }
-    } catch (err: any) {
-      console.error("Error fetching real matches:", err);
-      setFetchError({
-        message: err.message || 'Nieznany błąd podczas pobierania realnych meczów.',
-        code: err.code
-      });
+    } catch (err) {
+      console.error("Błąd pobierania z API:", err);
     } finally {
       setFetchingReal(false);
     }
   };
 
+  const handleTriggerAiAnalysis = async (matchId: string) => {
+    const targetMatch = matches.find(m => m.id === matchId);
+    if (!targetMatch) return;
+    setAnalyzingMatchId(matchId);
+    setAiError(null);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+      const res = await fetch(`${baseUrl}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ match: targetMatch })
+      });
+      if (!res.ok) throw new Error("Błąd AI");
+      const data = await res.json();
+      if (data.analysis) {
+        handleUpdateMatch({
+          ...targetMatch,
+          aiAnaliza: data.analysis
+        });
+      }
+    } catch (e: any) {
+      setAiError(e.message || "Błąd generowania analizy");
+    } finally {
+      setAnalyzingMatchId(null);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans" id="app-root-wrapper">
-      {/* Pasek nawigacji u samej góry */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-50 px-4 md:px-6 py-4 shadow-sm">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Logo i Tytuł */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-lg font-display font-bold tracking-tight text-slate-100 flex items-center gap-2">
-                Asystent Live Bet AI
-                <span className="text-[10px] bg-emerald-950/50 border border-emerald-800/50 text-emerald-400 font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                  v2.0 PRO
-                </span>
-              </h1>
-              <p className="text-xs text-slate-400 font-sans">
-                Profesjonalny kalkulator EV zasilany Gemini AI
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#060b11] text-slate-100 flex flex-col lg:flex-row antialiased font-sans">
+      {/* 1. WĄSKI PANEL BOCZNY (Lewa kolumna) */}
+      <AppSidebar
+        currentTab={currentTab}
+        onSelectTab={setCurrentTab}
+        balance={currentBalance}
+      />
 
-          {/* Status Systemu */}
-          <div className="flex items-center gap-2 text-xs flex-wrap justify-center sm:justify-end">
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-full p-2 text-slate-300 hover:text-emerald-400 cursor-pointer transition-all duration-300 flex items-center justify-center shadow-sm"
-              title={theme === 'dark' ? 'Przełącz na tryb jasny (stadionowy)' : 'Przełącz na tryb ciemny (nocny)'}
-              id="theme-toggle-btn"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-emerald-600" />
+      {/* 2. GŁÓWNA PRZESTRZEŃ APLIKACJI */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Górny Header */}
+        <AppTopHeader
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onOpenSettings={() => setShowApiModal(true)}
+          isApiActive={true}
+        />
+
+        {/* Zawartość zależna od wybranej zakładki */}
+        <main className="flex-1 p-4 sm:p-6 max-w-[1600px] w-full mx-auto space-y-6">
+          {/* Inteligentne Powiadomienia w tle */}
+          <IntelligentNotifications
+            matches={matches}
+            onSelectMatch={handleSelectMatch}
+            selectedMatchId={selectedMatchId}
+          />
+
+          {currentTab === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Główny układ Dashboardu z podziałem na Main Match View i Złote Okno Obstawiania */}
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                {/* SEKCJA ANALIZY MECZU (Środek / Lewo w Gridzie: 7 kolumn) */}
+                <div className="xl:col-span-7 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-base font-bold font-display text-slate-100 flex items-center gap-2">
+                      <span>Main Match View</span>
+                    </h2>
+
+                    {selectedMatch && (
+                      <button
+                        onClick={() => handleTriggerAiAnalysis(selectedMatch.id)}
+                        disabled={analyzingMatchId === selectedMatch.id}
+                        className="flex items-center gap-1.5 bg-sky-950/70 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer disabled:opacity-50"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 text-sky-400 ${analyzingMatchId === selectedMatch.id ? 'animate-spin' : ''}`} />
+                        <span>{analyzingMatchId === selectedMatch.id ? 'Generowanie...' : 'Analiza AI Gemini'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedMatch ? (
+                    <div className="space-y-4 animate-fadeIn">
+                      {/* Live Match Map - 2D Boisko piłkarskie ze strefami taktycznymi */}
+                      <LivePitchMap match={selectedMatch} />
+
+                      {/* Miniatura statystyk (Possession, Pressure Index, Shots, Line of Stagnation, Wave Timeline) */}
+                      <MatchPitchStats match={selectedMatch} />
+                    </div>
+                  ) : (
+                    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-12 text-center text-slate-400">
+                      Wybierz mecz z listy, aby wyświetlić analizę na żywo.
+                    </div>
+                  )}
+                </div>
+
+                {/* PRAWA STRONA: ZŁOTE OKNO OBSTAWIANIA + KOMPAKTOWA LISTA MECZÓW (5 kolumn) */}
+                <div className="xl:col-span-5 space-y-4">
+                  {selectedMatch && (
+                    <GoldenBettingHero
+                      match={selectedMatch}
+                      bankrollSettings={bankrollSettings}
+                      matches={matches}
+                      onUpdateMatch={handleUpdateMatch}
+                    />
+                  )}
+
+                  {/* Zwarty podgląd listy meczów i filtrów API */}
+                  <CompactMatchListView
+                    matches={filteredMatches}
+                    apiFetchedMatches={apiFetchedMatches}
+                    selectedMatchId={selectedMatchId}
+                    pinnedMatchIds={pinnedMatchIds}
+                    onSelectMatch={handleSelectMatch}
+                    onFetchRealMatches={handleFetchRealMatches}
+                    fetchingReal={fetchingReal}
+                    onOpenAddMatchModal={() => setShowAddForm(true)}
+                  />
+                </div>
+              </div>
+
+              {/* Dodatkowe raporty AI dla wybranego meczu, jeśli wygenerowano */}
+              {selectedMatch && selectedMatch.aiAnaliza && (
+                <div className="mt-6">
+                  <AiAnalysisView
+                    analysis={selectedMatch.aiAnaliza}
+                    loading={analyzingMatchId === selectedMatch.id}
+                    error={analyzingMatchId === selectedMatch.id ? aiError : null}
+                    matchName={`${selectedMatch.gospodarz} - ${selectedMatch.gosc}`}
+                    match={selectedMatch}
+                  />
+                </div>
               )}
-            </button>
-            <button
-              onClick={() => setShowApiModal(true)}
-              className="bg-slate-950 border border-slate-800 hover:border-emerald-500/50 rounded-full px-4 py-1.5 text-slate-300 font-mono flex items-center gap-2 cursor-pointer transition-all duration-300"
-              title="Konfiguruj klucz API do pobierania prawdziwych meczów"
-            >
-              <Key className={`w-3.5 h-3.5 ${footballApiKey ? 'text-emerald-400' : 'text-amber-400'}`} />
-              <span>{footballApiKey ? 'API AKTYWNE' : 'API KONFIGURUJ'}</span>
-            </button>
-            <div className="bg-slate-950 border border-slate-800 rounded-full px-4 py-1.5 text-slate-400 font-mono flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-              AI: ONLINE
             </div>
-          </div>
-        </div>
-      </header>
+          )}
 
-      {/* Główna sekcja robocza */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
-        {/* Widget globalnych statystyk portfela zakładów */}
-        <StatsHistory 
-          matches={matches} 
-          bankrollSettings={bankrollSettings}
-          onUpdateBankrollSettings={setBankrollSettings}
-        />
-
-        {/* Inteligentne Powiadomienia o Sygnałach Live */}
-        <IntelligentNotifications 
-          matches={matches}
-          onSelectMatch={handleSelectMatch}
-          selectedMatchId={selectedMatchId}
-        />
-
-        {/* Sekcja: Sidebar meczów + Panel Roboczy */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Kolumna Lewa: Lista meczów i sterowanie listą */}
-          <div className="lg:col-span-4 xl:col-span-3 min-w-0 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg h-[520px] sm:h-[600px] lg:h-[800px] lg:sticky lg:top-[85px] flex flex-col">
-            <MatchList
-              matches={matches}
-              apiFetchedMatches={apiFetchedMatches}
-              onAddFromApi={handleAddFromApi}
-              selectedMatchId={selectedMatchId}
-              pinnedMatchIds={pinnedMatchIds}
-              onTogglePinMatch={togglePinMatch}
-              onSelectMatch={handleSelectMatch}
-              onAddMatch={handleAddMatch}
-              onDeleteMatch={handleDeleteMatch}
-              onUpdateStatus={handleUpdateStatus}
-              onFetchRealMatches={handleFetchRealMatches}
-              fetchingReal={fetchingReal}
-              fetchError={fetchError}
-              footballApiKey={footballApiKey}
-              onUpdateFootballApiKey={setFootballApiKey}
-              showForm={showAddForm}
-              onShowFormChange={setShowAddForm}
-              onClearAllMatches={handleClearAllMatches}
-            />
-          </div>
- 
-          {/* Kolumna Prawa: Formularz kontroli, rozkład matematyczny i analizy AI */}
-          <div className="lg:col-span-8 xl:col-span-9 min-w-0 space-y-6">
-            {selectedMatch ? (
-              <div key={selectedMatch.id} className="space-y-6 animate-fadeIn">
-                {/* 1. Panel Analizy Probabilistycznej i Kursów */}
-                <AnalysisPanel
-                  match={selectedMatch}
-                  matches={matches}
-                  onUpdateMatch={handleUpdateMatch}
-                  onTriggerAiAnalysis={handleTriggerAiAnalysis}
-                  aiLoading={analyzingMatchId === selectedMatch.id}
-                  bankrollSettings={bankrollSettings}
-                  onOpenAddMatchForm={() => setShowAddForm(true)}
-                  lastFetched={lastFetched}
-                />
-
-                {/* 2. Dedykowany podgląd szczegółowego raportu AI */}
-                <AiAnalysisView
-                  analysis={selectedMatch.aiAnaliza}
-                  loading={analyzingMatchId === selectedMatch.id}
-                  error={analyzingMatchId === selectedMatch.id ? aiError : null}
-                  matchName={`${selectedMatch.gospodarz} - ${selectedMatch.gosc}`}
-                  match={selectedMatch}
-                />
-              </div>
-            ) : (
-              <div className="text-center py-12 px-6 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
-                <p className="text-slate-400 font-medium">Wybierz mecz z listy po lewej stronie, aby wyświetlić konsolę analityczną.</p>
-                <p className="text-xs text-slate-500">Możesz też przypiąć mecze pinezką, aby zawsze były widoczne na samej górze.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-
-      {/* Stopka */}
-      <footer className="border-t border-slate-850 bg-slate-900/40 py-5 px-4 mt-12 text-center text-xs text-slate-500 font-sans">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-1.5 justify-center">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Asystent matematyczno-probabilistyczny. Hazard wiąże się z ryzykiem uzależnienia i utraty kapitału. Graj rozważnie.</span>
-          </div>
-          <div className="flex items-center gap-3 justify-center">
-            <div className="flex items-center gap-1 justify-center">
-              <span>Stworzone przy użyciu</span>
-              <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-              <span>dla typerów zakładów na żywo</span>
+          {/* Zakładka: Analytics & Zaawansowane Modele */}
+          {currentTab === 'analytics' && selectedMatch && (
+            <div className="animate-fadeIn">
+              <AnalysisPanel
+                match={selectedMatch}
+                matches={matches}
+                onUpdateMatch={handleUpdateMatch}
+                onTriggerAiAnalysis={handleTriggerAiAnalysis}
+                aiLoading={analyzingMatchId === selectedMatch.id}
+                bankrollSettings={bankrollSettings}
+                onOpenAddMatchForm={() => setShowAddForm(true)}
+                lastFetched={lastFetched}
+              />
             </div>
-            <QRCodeDisplay />
-          </div>
-        </div>
-      </footer>
+          )}
+
+          {/* Zakładka: Exports & Historia Zakładów */}
+          {currentTab === 'exports' && (
+            <div className="animate-fadeIn">
+              <StatsHistory
+                matches={matches}
+                bankrollSettings={bankrollSettings}
+                onUpdateBankrollSettings={setBankrollSettings}
+              />
+            </div>
+          )}
+
+          {/* Zakładka: Filtry / Wszystkie mecze */}
+          {currentTab === 'filtry' && (
+            <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-4 animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <SlidersHorizontal className="w-5 h-5 text-sky-400" />
+                  Zarządzanie Meczami i Filtrami
+                </h2>
+                <button
+                  onClick={handleFetchRealMatches}
+                  disabled={fetchingReal}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                >
+                  {fetchingReal ? 'Pobieranie...' : 'Pobierz mecze z API'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {matches.map(m => (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      setSelectedMatchId(m.id);
+                      setCurrentTab('dashboard');
+                    }}
+                    className="bg-[#0e1724] border border-slate-800 hover:border-sky-500 p-4 rounded-xl cursor-pointer transition shadow-md"
+                  >
+                    <div className="flex justify-between text-xs text-slate-400 mb-2 font-mono">
+                      <span className="text-emerald-400 font-bold">Minuta {m.minuta}'</span>
+                      <span>@{m.kursZalecany || m.kurs1}</span>
+                    </div>
+                    <div className="text-sm font-bold text-slate-100">{m.gospodarz} {m.gole1} : {m.gole2} {m.gosc}</div>
+                    <div className="text-xs text-slate-400 mt-2 line-clamp-2">{m.notatki || 'Brak notatek'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Zakładka: Morning / Live Monitoring */}
+          {currentTab === 'morning' && (
+            <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-4 animate-fadeIn">
+              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
+                Live Match Tracker & Monitoring Poranny
+              </h2>
+              <p className="text-xs text-slate-400">
+                Wszystkie aktywne spotkania monitorowane w czasie rzeczywistym przez algorytm wykrywania Złotych Okien.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {matches.filter(m => m.status === 'niesprawdzony').map(m => (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      setSelectedMatchId(m.id);
+                      setCurrentTab('dashboard');
+                    }}
+                    className="p-4 rounded-xl bg-[#0e1724] border border-slate-800 hover:border-emerald-500/70 transition cursor-pointer"
+                  >
+                    <div className="flex justify-between text-xs text-emerald-400 font-bold mb-2">
+                      <span>LIVE {m.minuta}'</span>
+                      <span className="text-slate-300">EV: {((m.evZalecane || 0.05) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="text-sm font-bold text-slate-200">{m.gospodarz} vs {m.gosc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Zakładka: Settings / Bankroll & Config */}
+          {currentTab === 'settings' && (
+            <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-6 animate-fadeIn max-w-2xl">
+              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-sky-400" />
+                Ustawienia Bankrollu & Strategii Stawek
+              </h2>
+
+              <div className="space-y-4 bg-[#0e1724] p-5 rounded-xl border border-slate-800">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">Kapitał początkowy (PLN):</label>
+                  <input
+                    type="number"
+                    value={bankrollSettings.initial}
+                    onChange={(e) => setBankrollSettings(prev => ({ ...prev, initial: Math.max(10, parseFloat(e.target.value) || 1000) }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">Strategia doboru stawki:</label>
+                  <select
+                    value={bankrollSettings.strategy}
+                    onChange={(e) => setBankrollSettings(prev => ({ ...prev, strategy: e.target.value as any }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500"
+                  >
+                    <option value="percent">Procent kapitału (%)</option>
+                    <option value="kelly">Kryterium Kelly'ego (Fractional)</option>
+                    <option value="flat">Stała stawka kwotowa (PLN)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    {bankrollSettings.strategy === 'percent' ? 'Procent bankrollu na zakład (%)' : bankrollSettings.strategy === 'kelly' ? 'Mnożnik ułamkowy Kelly (np. 0.5 lub 1)' : 'Stała stawka (PLN)'}:
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={bankrollSettings.parameter}
+                    onChange={(e) => setBankrollSettings(prev => ({ ...prev, parameter: Math.max(0.1, parseFloat(e.target.value) || 2) }))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Modal konfiguracji klucza API */}
       {showApiModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full overflow-hidden shadow-2xl">
+          <div className="bg-[#0b131e] border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
             <div className="p-5 border-b border-slate-800 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
                 <Key className="w-5 h-5 text-amber-500" />
-                Konfiguracja klucza Football-Data.org
+                Konfiguracja API Meczów Live
               </h3>
               <button
                 onClick={() => setShowApiModal(false)}
@@ -604,47 +481,29 @@ export default function App() {
             </div>
             <div className="p-5 space-y-4">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Asystent pozwala na pobieranie rzeczywistych dzisiejszych meczów piłkarskich bezpośrednio z zewnętrznej bazy danych. Wymagany jest darmowy klucz API.
+                Wprowadź swój darmowy klucz API (np. z Football-Data.org), aby pobierać mecze z całego świata w czasie rzeczywistym.
               </p>
-              
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-850 text-xs text-slate-400 space-y-1">
-                <p className="font-bold text-slate-100 mb-1 text-[11px] uppercase tracking-wide">Jak zdobyć klucz?</p>
-                <p>1. Wejdź na stronę <a href="https://www.football-data.org/" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">football-data.org</a></p>
-                <p>2. Zarejestruj darmowe konto (trwa to 30 sekund)</p>
-                <p>3. Otrzymany klucz API wklej poniżej</p>
-              </div>
 
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Twój klucz API (X-Auth-Token):
+                  Klucz API (X-Auth-Token):
                 </label>
                 <input
                   type="text"
                   value={footballApiKey}
                   onChange={(e) => setFootballApiKey(e.target.value)}
-                  placeholder="np. a1b2c3d4e5f6..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500 font-mono"
-                  autoFocus
+                  placeholder="Wklej swój klucz API..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500 font-mono"
                 />
               </div>
             </div>
             <div className="p-4 bg-slate-950/60 border-t border-slate-800 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setFootballApiKey('');
-                  setShowApiModal(false);
-                }}
-                className="px-3.5 py-1.5 text-xs text-red-400 hover:text-red-300 font-medium transition cursor-pointer"
-              >
-                Wyczyść klucz
-              </button>
-              <button
-                type="button"
                 onClick={() => setShowApiModal(false)}
-                className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition shadow-md shadow-emerald-950/20 cursor-pointer"
+                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition cursor-pointer"
               >
-                Zapisz i zamknij
+                Zapisz
               </button>
             </div>
           </div>

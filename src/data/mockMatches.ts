@@ -2,6 +2,31 @@ import { LiveMatch } from '../types';
 
 export const INITIAL_MATCHES: LiveMatch[] = [
   {
+    id: 'montevideo-match-74',
+    gospodarz: 'River Plate Montevideo II',
+    gosc: 'Montevideo City Torque II',
+    gole1: 1,
+    gole2: 2,
+    minuta: 74,
+    kurs1: 3.98,
+    kurs_x: 3.10,
+    kurs2: 1.28,
+    strzaly1: 1,
+    strzaly2: 2,
+    strzalyCelne1: 0,
+    strzalyCelne2: 2,
+    rzutyRozne1: 2,
+    rzutyRozne2: 5,
+    posiadaniePilki1: 47,
+    posiadaniePilki2: 53,
+    notatki: 'Lider kontroluje grę, stagnacja przeciwnika wysoka. Przeciwnik nie wykazuje chęci ataku. Ryzyko straty gola znikome.',
+    status: 'niesprawdzony',
+    typZalecany: 'Remis Bez Zakładu: DNB 2',
+    kursZalecany: 1.28,
+    evZalecane: 0.022,
+    dataDodania: new Date().toISOString()
+  },
+  {
     id: '1',
     gospodarz: 'Real Madryt',
     gosc: 'FC Barcelona',
