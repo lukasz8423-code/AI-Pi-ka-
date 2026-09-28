@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { LiveMatch } from '../types';
 import { uzyskaj_pre_match_proby } from '../utils/bettingCalc';
 import { fetchStatsForMatch } from '../utils/apiService';
-import { Plus, X, Sparkles, RefreshCw, AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { Plus, X, RefreshCw, AlertCircle, CheckCircle2, Download, HelpCircle, CheckSquare, Square } from 'lucide-react';
 
 interface AddMatchModalProps {
   isOpen: boolean;
@@ -30,7 +30,11 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
   const [strzaly2, setStrzaly2] = useState('');
   const [strzalyCelne1, setStrzalyCelne1] = useState('');
   const [strzalyCelne2, setStrzalyCelne2] = useState('');
-  const [posiadaniePilki1, setPosiadaniePilki1] = useState('');
+  
+  // Posiadanie piłki - domyślnie stan "Brak danych / Nieznane"
+  const [knowsPossession, setKnowsPossession] = useState(false);
+  const [posiadaniePilki1, setPosiadaniePilki1] = useState<number | ''>('');
+  
   const [notatki, setNotatki] = useState('');
 
   const [fetchingApi, setFetchingApi] = useState(false);
@@ -51,6 +55,7 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
     setStrzaly2('');
     setStrzalyCelne1('');
     setStrzalyCelne2('');
+    setKnowsPossession(false);
     setPosiadaniePilki1('');
     setNotatki('');
     setApiFeedback(null);
@@ -83,7 +88,15 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
         setStrzaly2(String(stats.strzaly2 ?? 5));
         setStrzalyCelne1(String(stats.strzalyCelne1 ?? 3));
         setStrzalyCelne2(String(stats.strzalyCelne2 ?? 2));
-        setPosiadaniePilki1(String(stats.posiadaniePilki1 ?? 50));
+        
+        if (typeof stats.posiadaniePilki1 === 'number') {
+          setKnowsPossession(true);
+          setPosiadaniePilki1(stats.posiadaniePilki1);
+        } else {
+          setKnowsPossession(false);
+          setPosiadaniePilki1('');
+        }
+
         if (stats.notatki) setNotatki(stats.notatki);
 
         setApiFeedback({
@@ -116,7 +129,11 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
     const parsedKurs1 = parseFloat(kurs1) > 1.01 ? parseFloat(kurs1) : 2.0;
     const parsedKursX = parseFloat(kurs_x) > 1.01 ? parseFloat(kurs_x) : 3.0;
     const parsedKurs2 = parseFloat(kurs2) > 1.01 ? parseFloat(kurs2) : 3.0;
-    const parsedPossession = Math.min(95, Math.max(5, parseInt(posiadaniePilki1) || 50));
+    
+    // Obsługa posiadania piłki: jeśli nie zaznaczono, ustawiamy undefined (brak danych)
+    const hasValidPossession = knowsPossession && posiadaniePilki1 !== '';
+    const parsedPossession1 = hasValidPossession ? Math.min(95, Math.max(5, Number(posiadaniePilki1))) : undefined;
+    const parsedPossession2 = hasValidPossession && parsedPossession1 !== undefined ? 100 - parsedPossession1 : undefined;
 
     const newId = `custom-${Date.now()}`;
     const matchObj: LiveMatch = {
@@ -129,12 +146,12 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
       kurs1: parsedKurs1,
       kurs_x: parsedKursX,
       kurs2: parsedKurs2,
-      strzaly1: parseInt(strzaly1) || 0,
-      strzaly2: parseInt(strzaly2) || 0,
-      strzalyCelne1: parseInt(strzalyCelne1) || 0,
-      strzalyCelne2: parseInt(strzalyCelne2) || 0,
-      posiadaniePilki1: parsedPossession,
-      posiadaniePilki2: 100 - parsedPossession,
+      strzaly1: strzaly1 ? parseInt(strzaly1) : undefined,
+      strzaly2: strzaly2 ? parseInt(strzaly2) : undefined,
+      strzalyCelne1: strzalyCelne1 ? parseInt(strzalyCelne1) : undefined,
+      strzalyCelne2: strzalyCelne2 ? parseInt(strzalyCelne2) : undefined,
+      posiadaniePilki1: parsedPossession1,
+      posiadaniePilki2: parsedPossession2,
       notatki: notatki.trim(),
       status: 'niesprawdzony',
       dataDodania: new Date().toISOString(),
@@ -361,20 +378,65 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
             </div>
           </div>
 
-          {/* Posiadanie piłki */}
-          <div>
-            <div className="flex justify-between text-[11px] font-bold text-slate-300 mb-1">
-              <span>Posiadanie piłki gospodarza:</span>
-              <span className="text-sky-400">{posiadaniePilki1 ? `${posiadaniePilki1}%` : '50%'}</span>
+          {/* Posiadanie piłki z jawnym stanem 'Nieznane / Brak danych' */}
+          <div className="bg-[#0e1724] p-3 rounded-xl border border-slate-800/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                <span>Posiadanie piłki:</span>
+              </label>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  if (knowsPossession) {
+                    setKnowsPossession(false);
+                    setPosiadaniePilki1('');
+                  } else {
+                    setKnowsPossession(true);
+                    setPosiadaniePilki1(50);
+                  }
+                }}
+                className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-400 hover:text-sky-300 transition cursor-pointer"
+              >
+                {knowsPossession ? (
+                  <>
+                    <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-300">Wprowadzone</span>
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="text-slate-400">Brak danych (nieznane)</span>
+                  </>
+                )}
+              </button>
             </div>
-            <input
-              type="range"
-              min="10"
-              max="90"
-              value={posiadaniePilki1 || '50'}
-              onChange={(e) => setPosiadaniePilki1(e.target.value)}
-              className="w-full accent-sky-500 cursor-pointer"
-            />
+
+            {knowsPossession ? (
+              <div className="space-y-1.5 pt-1 animate-fadeIn">
+                <div className="flex justify-between text-[11px] font-bold">
+                  <span className="text-emerald-400">
+                    {gospodarz.trim() || 'Gospodarz'}: {posiadaniePilki1 !== '' ? `${posiadaniePilki1}%` : '50%'}
+                  </span>
+                  <span className="text-sky-400">
+                    {gosc.trim() || 'Gość'}: {posiadaniePilki1 !== '' ? `${100 - Number(posiadaniePilki1)}%` : '50%'}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="90"
+                  value={posiadaniePilki1 !== '' ? posiadaniePilki1 : 50}
+                  onChange={(e) => setPosiadaniePilki1(Number(e.target.value))}
+                  className="w-full accent-sky-500 cursor-pointer"
+                />
+              </div>
+            ) : (
+              <div className="p-2 bg-slate-950/60 rounded-lg border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
+                <HelpCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span>Posiadanie nieznane – Gemini AI nie otrzyma fałszywych wartości 50/50.</span>
+              </div>
+            )}
           </div>
 
           {/* Notatki taktyczne */}

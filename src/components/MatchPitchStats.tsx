@@ -6,17 +6,19 @@ interface MatchPitchStatsProps {
 }
 
 export const MatchPitchStats: React.FC<MatchPitchStatsProps> = ({ match }) => {
-  const possessionAway = match.posiadaniePilki2 ?? 53;
-  const possessionHome = match.posiadaniePilki1 ?? (100 - possessionAway);
+  const hasPossession = typeof match.posiadaniePilki1 === 'number' || typeof match.posiadaniePilki2 === 'number';
+  const possessionAway = typeof match.posiadaniePilki2 === 'number' ? match.posiadaniePilki2 : (typeof match.posiadaniePilki1 === 'number' ? 100 - match.posiadaniePilki1 : null);
+  const possessionHome = typeof match.posiadaniePilki1 === 'number' ? match.posiadaniePilki1 : (possessionAway !== null ? 100 - possessionAway : null);
 
   const shotsOnHome = match.strzalyCelne1 ?? 0;
-  const shotsOnAway = match.strzalyCelne2 ?? 2;
-  const shotsTotalHome = match.strzaly1 ?? 1;
-  const shotsTotalAway = match.strzaly2 ?? 2;
+  const shotsOnAway = match.strzalyCelne2 ?? 0;
+  const shotsTotalHome = match.strzaly1 ?? 0;
+  const shotsTotalAway = match.strzaly2 ?? 0;
 
-  // Pressure Index (szacowany na 68 na korzyść drużyny dominującej)
-  const pressureVal = 68;
-  const dominantTeam = match.gosc;
+  // Pressure Index (szacowany na korzyść drużyny z wyższą liczbą goli/strzałów)
+  const isHomeDominant = match.gole1 > match.gole2 || (shotsTotalHome > shotsTotalAway);
+  const dominantTeam = isHomeDominant ? match.gospodarz : match.gosc;
+  const pressureVal = Math.min(95, Math.max(45, 50 + (match.gole1 - match.gole2) * 12 + (shotsTotalHome - shotsTotalAway) * 2));
 
   // Line of stagnation (np. 1.1 / 10)
   const stagnationVal = 1.1;
@@ -37,26 +39,33 @@ export const MatchPitchStats: React.FC<MatchPitchStatsProps> = ({ match }) => {
                 fill="none"
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
-              <path
-                className="text-sky-400"
-                strokeDasharray={`${possessionAway}, 100`}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
+              {hasPossession && possessionAway !== null && (
+                <path
+                  className="text-sky-400"
+                  strokeDasharray={`${possessionAway}, 100`}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              )}
             </svg>
             <span className="absolute text-[11px] font-bold text-slate-200 font-mono">
-              {possessionAway}%
+              {hasPossession && possessionAway !== null ? `${possessionAway}%` : '--'}
             </span>
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-bold text-slate-100 font-display">{possessionAway}%</div>
-            <div className="text-[10px] text-slate-400 truncate">{dominantTeam}</div>
+            <div className="text-sm font-bold text-slate-100 font-display">
+              {hasPossession && possessionAway !== null ? `${possessionAway}%` : 'Brak'}
+            </div>
+            <div className="text-[10px] text-slate-400 truncate">
+              {hasPossession ? dominantTeam : 'Brak danych'}
+            </div>
           </div>
         </div>
       </div>
+
 
       {/* 2. Pressure Index (Okrągły wskaźnik) */}
       <div className="bg-[#0b131e] border border-slate-850 rounded-xl p-3.5 flex flex-col justify-between shadow-md">

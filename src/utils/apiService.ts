@@ -342,14 +342,19 @@ export async function fetchAiAnalysisSafe(
     const envBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
     const endpoint = `${envBaseUrl}/api/analyze`;
 
+    const possessionStr = (typeof match.posiadaniePilki1 === 'number' && typeof match.posiadaniePilki2 === 'number')
+      ? `${match.posiadaniePilki1}% (${match.gospodarz}) - ${match.posiadaniePilki2}% (${match.gosc})`
+      : 'Brak danych (nieznane)';
+
     const prompt = `Przeanalizuj taktycznie mecz na żywo pod kątem value betu i Złotego Okna Obstawiania:
 Mecz: ${match.gospodarz} (${match.gole1}) vs (${match.gole2}) ${match.gosc}
 Minuta: ${match.minuta}'
 Kursy STS: 1: ${match.kurs1}, X: ${match.kurs_x}, 2: ${match.kurs2}
-Strzały: ${match.strzaly1 || 0} (celne: ${match.strzalyCelne1 || 0}) vs ${match.strzaly2 || 0} (celne: ${match.strzalyCelne2 || 0})
-Posiadanie piłki: ${match.posiadaniePilki1 || 50}% - ${match.posiadaniePilki2 || 50}%
+Strzały: ${match.strzaly1 !== undefined ? match.strzaly1 : 'brak danych'} (celne: ${match.strzalyCelne1 !== undefined ? match.strzalyCelne1 : 'brak danych'}) vs ${match.strzaly2 !== undefined ? match.strzaly2 : 'brak danych'} (celne: ${match.strzalyCelne2 !== undefined ? match.strzalyCelne2 : 'brak danych'})
+Posiadanie piłki: ${possessionStr}
 Notatki meczowe: ${match.notatki || 'Brak'}
 Określ dominację, ryzyko straty gola oraz optymalny typ na końcówkę spotkania.`;
+
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
