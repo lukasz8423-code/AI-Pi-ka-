@@ -27,12 +27,12 @@ export const LivePitchMap: React.FC<LivePitchMapProps> = ({ match, onDeleteMatch
   const isAwayAttacking = awayShots > homeShots || match.gole2 > match.gole1 || awayPossession > homePossession;
 
   return (
-    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden flex flex-col justify-between">
-      {/* Nagłówek sekcji */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden flex flex-col justify-between space-y-3">
+      {/* Nagłówek sekcji z zabezpieczonym, spójnym layoutem */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-2 border-b border-slate-850">
         <div>
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${hasRealStats ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${hasRealStats ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
             <span className={`text-xs font-semibold tracking-wide uppercase ${hasRealStats ? 'text-emerald-400' : 'text-slate-400'}`}>
               {hasRealStats ? 'Live Match Map (Aktywna)' : 'Live Match Map (Standby)'}
             </span>
@@ -44,44 +44,47 @@ export const LivePitchMap: React.FC<LivePitchMapProps> = ({ match, onDeleteMatch
           </p>
         </div>
 
-        {/* Wynik na żywo & Narzędzia szybkiej edycji */}
-        <div className="flex items-center gap-2 sm:gap-3 bg-slate-950/80 border border-slate-800 px-3.5 py-1.5 rounded-xl self-start sm:self-auto shadow-sm">
-          <span className="text-xs font-bold text-slate-200 truncate max-w-[100px] sm:max-w-[130px]">
+        {/* Bezpieczny kafelek z wynikiem i przyciskami edycji */}
+        <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2.5 bg-slate-950/90 border border-slate-800 px-3.5 py-2 rounded-xl shrink-0 shadow-sm">
+          <span className="text-xs font-bold text-slate-200 truncate max-w-[100px] sm:max-w-[120px] text-right">
             {match.gospodarz}
           </span>
-          <div className="flex flex-col items-center">
+
+          <div className="flex flex-col items-center shrink-0 px-2 min-w-[60px]">
             <span className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none">LIVE</span>
-            <div className="bg-sky-600/90 text-white font-mono font-black text-sm px-2.5 py-0.5 rounded my-0.5 shadow-sm">
+            <div className="bg-sky-600 text-white font-mono font-black text-xs sm:text-sm px-2 py-0.5 rounded my-0.5 shadow-sm shrink-0">
               {match.gole1} : {match.gole2}
             </div>
-            <span className="text-[10px] text-slate-400 font-mono">Minuta {match.minuta}'</span>
+            <span className="text-[10px] text-slate-400 font-mono shrink-0">Minuta {match.minuta}'</span>
           </div>
-          <span className="text-xs font-bold text-slate-200 truncate max-w-[100px] sm:max-w-[130px]">
+
+          <span className="text-xs font-bold text-slate-200 truncate max-w-[100px] sm:max-w-[120px] text-left">
             {match.gosc}
           </span>
 
-          {/* Przycisk Szybkiej Edycji Parametrów */}
-          {onEditMatch && (
-            <button
-              type="button"
-              onClick={() => onEditMatch(match)}
-              className="p-1.5 text-sky-400 hover:text-sky-200 hover:bg-sky-950/60 rounded-lg transition-all cursor-pointer border border-sky-800/40 ml-1"
-              title="Edytuj wynik, minutę, kursy i statystyki meczu"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="flex items-center gap-1 border-l border-slate-800 pl-2 ml-1 shrink-0">
+            {onEditMatch && (
+              <button
+                type="button"
+                onClick={() => onEditMatch(match)}
+                className="p-1.5 text-sky-400 hover:text-sky-200 hover:bg-sky-950/60 rounded-lg transition-all cursor-pointer border border-sky-800/40"
+                title="Edytuj wynik, minutę, kursy i statystyki meczu"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+            )}
 
-          {onDeleteMatch && (
-            <button
-              type="button"
-              onClick={() => onDeleteMatch(match.id)}
-              className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer"
-              title="Usuń ten mecz z listy"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
+            {onDeleteMatch && (
+              <button
+                type="button"
+                onClick={() => onDeleteMatch(match.id)}
+                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer"
+                title="Usuń ten mecz z listy"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LiveMatch } from '../types';
-import { DollarSign, TrendingUp, Lock, AlertTriangle, RefreshCw, Calculator, ChevronDown, ChevronUp, CheckCircle, Flame } from 'lucide-react';
-import { pobierz_i_opisz_staty, przelicz_prawdopodobienstwa, wygladz_prawdopodobienstwa, uzyskaj_pre_match_proby } from '../utils/bettingCalc';
+import { DollarSign, Flame, Calculator } from 'lucide-react';
+import { pobierz_i_opisz_staty, wygladz_prawdopodobienstwa, uzyskaj_pre_match_proby } from '../utils/bettingCalc';
 
 interface CashoutRadarPanelProps {
   match: LiveMatch;
@@ -67,22 +67,27 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
     match.zolteKartki1, match.zolteKartki2
   );
 
-  // Kalkulacja Szacowanej Wartości Cashoutu (% pierwotnej wygranej)
-  let estimatedCashoutPct = 0;
-  if (isCurrentlyWinning && currentLiveOdd > 0) {
-    const rawRatio = (initialOdd / Math.max(1.01, currentLiveOdd)) * 0.92;
-    const timeProgress = Math.min(1, minuta / 90);
-    const timeMultiplier = 0.5 + (timeProgress * 0.5);
-    estimatedCashoutPct = Math.min(98, Math.max(10, Math.round(rawRatio * timeMultiplier * 100)));
-  } else {
-    const ratio = (initialOdd / Math.max(currentLiveOdd, initialOdd * 1.5));
-    estimatedCashoutPct = Math.min(45, Math.max(5, Math.round(ratio * 35)));
-  }
-
-  // Realistyczna stawka dostosowana do budżetu 50 PLN (domyślnie 5 PLN zamiast 100 PLN!)
+  // Realistyczna stawka dostosowana do budżetu 50 PLN (domyślnie 5 PLN)
   const stake = betPlaced?.stake || 5.00;
   const maxPayout = Math.round(stake * initialOdd * 100) / 100;
-  const cashoutValuePLN = Math.min(maxPayout * 0.98, Math.round((maxPayout * estimatedCashoutPct) / 100 * 100) / 100);
+
+  // Precyzyjna, spójna kalkulacja Cashoutu w PLN
+  let cashoutValuePLN = 0;
+  if (isCurrentlyWinning) {
+    const timeProgress = Math.min(1, Math.max(0, (minuta - 1) / 89));
+    const oddsRatio = Math.min(1.0, initialOdd / Math.max(1.01, currentLiveOdd));
+    const winBonus = (maxPayout - stake) * (0.45 + 0.50 * timeProgress) * oddsRatio;
+    const rawCashout = stake + winBonus;
+    cashoutValuePLN = Math.min(maxPayout * 0.98, Math.max(stake * 0.9, Math.round(rawCashout * 100) / 100));
+  } else if (gole1 === gole2) {
+    const decay = Math.max(0.15, 0.85 - (minuta / 90) * 0.70);
+    cashoutValuePLN = Math.round(stake * decay * 100) / 100;
+  } else {
+    const stopLoss = Math.max(0.05, 0.30 - (minuta / 90) * 0.25);
+    cashoutValuePLN = Math.round(stake * stopLoss * 100) / 100;
+  }
+
+  const estimatedCashoutPct = maxPayout > 0 ? Math.min(98, Math.round((cashoutValuePLN / maxPayout) * 100)) : 0;
 
   // Rekomendacja Cashoutu dla automatycznego radaru
   let recommendation: 'LOCK_PROFIT' | 'HOLD' | 'STOP_LOSS' | 'WAIT' = 'WAIT';
@@ -124,7 +129,6 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
   const calcCashoutNum = typeof manualCashout === 'number' ? manualCashout : (cashoutValuePLN || 12);
 
   const profitIfCashout = calcCashoutNum - calcStakeNum;
-  const profitIfFullWin = calcPayoutNum - calcStakeNum;
   const cashoutVsFullPct = calcPayoutNum > 0 ? Math.round((calcCashoutNum / calcPayoutNum) * 100) : 0;
 
   return (
@@ -132,7 +136,7 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
       {/* Nagłówek Radar Cashoutu */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
             <DollarSign className="w-4 h-4 font-bold" />
           </div>
           <div>
@@ -148,7 +152,7 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
         <button
           type="button"
           onClick={() => setShowManualCalc(!showManualCalc)}
-          className="flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:text-sky-300 transition cursor-pointer bg-sky-950/60 border border-sky-800/60 px-2.5 py-1 rounded-lg"
+          className="flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:text-sky-300 transition cursor-pointer bg-sky-950/60 border border-sky-800/60 px-2.5 py-1 rounded-lg shrink-0"
         >
           <Calculator className="w-3.5 h-3.5" />
           <span>{showManualCalc ? 'Ukryj kalkulator' : 'Kalkulator własny'}</span>
@@ -159,10 +163,10 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
       <div className={`p-4 rounded-xl border ${recColor} space-y-2 transition-all`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Flame className="w-4 h-4 text-amber-400 animate-pulse" />
+            <Flame className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
             <h4 className="text-xs font-bold uppercase tracking-wider">{recTitle}</h4>
           </div>
-          <span className="text-[11px] font-mono font-bold bg-slate-950/80 px-2 py-0.5 rounded border border-slate-700">
+          <span className="text-[11px] font-mono font-bold bg-slate-950/80 px-2 py-0.5 rounded border border-slate-700 shrink-0">
             Szacowany Cashout: {estimatedCashoutPct}% Wygranej
           </span>
         </div>
