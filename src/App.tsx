@@ -55,7 +55,7 @@ export default function App() {
 
   const [bankrollSettings, setBankrollSettings] = useState<BankrollSettings>(() => {
     const defaultBankroll: BankrollSettings = {
-      initial: 1000,
+      initial: 50.00,
       strategy: 'percent',
       parameter: 2,
     };
@@ -64,8 +64,10 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
+          // Reset / sanitacja starych wartości (takich jak 1000, 14110 zł)
+          const isOldOrInvalid = !parsed.initial || parsed.initial === 1000 || parsed.initial >= 10000;
           return {
-            initial: parsed.initial || 1000,
+            initial: isOldOrInvalid ? 50.00 : Number(parsed.initial),
             strategy: parsed.strategy || 'percent',
             parameter: parsed.parameter || 2
           };
@@ -123,7 +125,13 @@ export default function App() {
       const resolved = matches.filter(m => m.status === 'wygrany' || m.status === 'przegrany');
       resolved.forEach(m => {
         const odd = m.kursZalecany || 1.8;
-        const stake = m.betPlaced?.stake ?? 100;
+        let stake = m.betPlaced?.stake;
+        if (typeof stake !== 'number' || stake <= 0) {
+          stake = bankrollSettings.strategy === 'flat' 
+            ? Math.min(bal, bankrollSettings.parameter) 
+            : Math.max(1, Math.round(bal * (bankrollSettings.parameter / 100) * 100) / 100);
+        }
+        if (stake > bal) stake = bal;
         if (m.status === 'wygrany') {
           bal += stake * (odd - 1);
         } else if (m.status === 'przegrany') {
@@ -134,7 +142,7 @@ export default function App() {
       console.error("Błąd salda:", e);
     }
     return Math.round(bal * 100) / 100;
-  }, [bankrollSettings.initial, matches]);
+  }, [bankrollSettings, matches]);
 
   // Aktualnie wybrany mecz
   const selectedMatch = useMemo(() => {
@@ -259,6 +267,7 @@ export default function App() {
           onOpenProfile={() => setShowProfileModal(true)}
           isApiActive={true}
           activeNotificationsCount={activeNotificationsCount}
+          balance={currentBalance}
         />
 
 

@@ -31,14 +31,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const wonCount = resolvedMatches.filter(m => m.status === 'wygrany').length;
   const lostCount = resolvedMatches.filter(m => m.status === 'przegrany').length;
   const totalBets = resolvedMatches.length;
-  const winRate = totalBets > 0 ? ((wonCount / totalBets) * 100).toFixed(1) : '78.4';
+  const winRate = totalBets > 0 ? ((wonCount / totalBets) * 100).toFixed(1) : '0.0';
   const profitPLN = currentBalance - bankrollSettings.initial;
-  const yieldPercent = bankrollSettings.initial > 0 ? ((profitPLN / bankrollSettings.initial) * 100).toFixed(1) : '14.1';
+  const yieldPercent = (bankrollSettings.initial > 0 && totalBets > 0) ? ((profitPLN / bankrollSettings.initial) * 100).toFixed(1) : '0.0';
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateBankrollSettings({
-      initial: Math.max(10, Number(initialCapital) || 1000),
+      initial: Math.max(1, Number(initialCapital) || 50),
       strategy,
       parameter: Math.max(0.1, Number(parameter) || 2),
     });
@@ -50,11 +50,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const handleResetCapital = () => {
-    setInitialCapital(1000);
+    setInitialCapital(50);
     setParameter(2);
     setStrategy('percent');
     onUpdateBankrollSettings({
-      initial: 1000,
+      initial: 50.00,
       strategy: 'percent',
       parameter: 2
     });
@@ -184,7 +184,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 className="text-[11px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" />
-                Resetuj do 1000 PLN
+                Resetuj do 50.00 PLN
               </button>
 
               <button

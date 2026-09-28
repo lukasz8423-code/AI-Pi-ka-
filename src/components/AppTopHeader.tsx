@@ -9,6 +9,7 @@ interface AppTopHeaderProps {
   onOpenProfile: () => void;
   isApiActive: boolean;
   activeNotificationsCount?: number;
+  balance?: number;
 }
 
 export const AppTopHeader: React.FC<AppTopHeaderProps> = ({
@@ -19,6 +20,7 @@ export const AppTopHeader: React.FC<AppTopHeaderProps> = ({
   onOpenProfile,
   isApiActive,
   activeNotificationsCount = 0,
+  balance = 50,
 }) => {
 
   return (
@@ -99,7 +101,9 @@ export const AppTopHeader: React.FC<AppTopHeaderProps> = ({
           </div>
           <div className="hidden md:flex flex-col text-left">
             <span className="text-xs font-bold text-slate-200 leading-tight group-hover:text-sky-300 transition">Rasador Boort</span>
-            <span className="text-[10px] font-mono font-semibold text-emerald-400 leading-tight">+14,110.00 PLN</span>
+            <span className="text-[10px] font-mono font-semibold text-emerald-400 leading-tight">
+              {balance.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+            </span>
           </div>
         </button>
       </div>

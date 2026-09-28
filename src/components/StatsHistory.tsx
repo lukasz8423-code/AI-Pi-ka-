@@ -298,9 +298,9 @@ export default function StatsHistory({
                 <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Budżet początkowy (PLN)</label>
                 <input
                   type="number"
-                  min="100"
+                  min="1"
                   value={bankrollSettings.initial}
-                  onChange={(e) => handleUpdateSetting('initial', Math.max(100, parseFloat(e.target.value) || 100))}
+                  onChange={(e) => handleUpdateSetting('initial', Math.max(1, parseFloat(e.target.value) || 50))}
                   className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-xs text-slate-100 outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
