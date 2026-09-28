@@ -291,3 +291,103 @@ Określ dominację, ryzyko straty gola oraz optymalny typ na końcówkę spotkan
     return { error: err.message || 'Brak połączenia z silnikiem analitycznym AI.' };
   }
 }
+
+/**
+ * Pobiera i uzupełnia statystyki dla konkretnego meczu z API zewnętrznego
+ */
+export async function fetchStatsForMatch(
+  homeTeam: string,
+  awayTeam: string,
+  apiKey?: string
+): Promise<Partial<LiveMatch> | null> {
+  const hLower = homeTeam.toLowerCase().trim();
+  const aLower = awayTeam.toLowerCase().trim();
+
+  // 1. Sprawdźmy mecze z API
+  try {
+    const res = await fetchRealMatchesSafe(apiKey, true);
+    if (res.matches && res.matches.length > 0) {
+      // Szukanie meczu po nazwie
+      const found = res.matches.find(m => {
+        const mH = m.gospodarz.toLowerCase();
+        const mA = m.gosc.toLowerCase();
+        return (
+          (hLower && mH.includes(hLower)) ||
+          (aLower && mA.includes(aLower)) ||
+          (hLower && mA.includes(hLower)) ||
+          (aLower && mH.includes(aLower))
+        );
+      });
+
+      if (found) {
+        return found;
+      }
+    }
+  } catch (e) {
+    console.warn("Błąd wyszukiwania w API real matches:", e);
+  }
+
+  // 2. Jeśli nie znaleziono w live feed, spróbujmy przez silnik hydratacji /api/hydrate-match
+  try {
+    const envBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+    const endpoint = `${envBaseUrl}/api/hydrate-match`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gospodarz: homeTeam || 'Gospodarze',
+        gosc: awayTeam || 'Goście',
+        minuta: 55,
+        gole1: 0,
+        gole2: 0,
+        kurs1: 2.20,
+        kurs_x: 3.10,
+        kurs2: 3.00,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        gospodarz: homeTeam,
+        gosc: awayTeam,
+        gole1: data.gole1 ?? 0,
+        gole2: data.gole2 ?? 0,
+        minuta: data.minuta ?? 55,
+        kurs1: data.kurs1 ?? 2.20,
+        kurs_x: data.kurs_x ?? 3.10,
+        kurs2: data.kurs2 ?? 3.00,
+        strzaly1: data.strzaly1 ?? 7,
+        strzaly2: data.strzaly2 ?? 5,
+        strzalyCelne1: data.strzalyCelne1 ?? 3,
+        strzalyCelne2: data.strzalyCelne2 ?? 2,
+        posiadaniePilki1: data.posiadaniePilki1 ?? 52,
+        posiadaniePilki2: data.posiadaniePilki2 ?? 48,
+        notatki: data.notatki || `Zsyntetyzowane statystyki meczu na podstawie modeli analitycznych.`,
+      };
+    }
+  } catch (e) {
+    console.warn("Błąd hydratacji:", e);
+  }
+
+  // 3. Fallback: generowanie spójnych statystyk
+  return {
+    gospodarz: homeTeam,
+    gosc: awayTeam,
+    gole1: 0,
+    gole2: 0,
+    minuta: 45,
+    kurs1: 2.30,
+    kurs_x: 3.10,
+    kurs2: 2.90,
+    strzaly1: 5,
+    strzaly2: 4,
+    strzalyCelne1: 2,
+    strzalyCelne2: 2,
+    posiadaniePilki1: 50,
+    posiadaniePilki2: 50,
+    notatki: `Statystyki wygenerowane dla: ${homeTeam} vs ${awayTeam}`
+  };
+}
+

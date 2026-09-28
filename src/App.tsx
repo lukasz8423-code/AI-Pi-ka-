@@ -25,42 +25,30 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Wczytywanie stanu meczów z LocalStorage lub mocków (oczyszczanie przestarzałych zaślepek)
+  // Wczytywanie stanu meczów z LocalStorage (czysta lista na starcie, brak wymuszonego autoloadu)
   const [matches, setMatches] = useState<LiveMatch[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Usunięcie starych zahardkodowanych zaślepek (np. montevideo)
+          // Usunięcie starych zaślepek
           const filtered = parsed.filter((m: LiveMatch) => m.id !== 'montevideo-match-74' && !m.id?.includes('montevideo'));
           if (filtered.length > 0) {
-            return filtered.map((m: LiveMatch) => {
-              if (!m.startingPreMatchProbs) {
-                return {
-                  ...m,
-                  startingPreMatchProbs: uzyskaj_pre_match_proby(m)
-                };
-              }
-              return m;
-            });
+            return filtered.map((m: LiveMatch) => ({
+              ...m,
+              startingPreMatchProbs: m.startingPreMatchProbs || uzyskaj_pre_match_proby(m)
+            }));
           }
         }
       } catch (e) {
         console.error("Błąd parsowania meczów z localStorage:", e);
       }
     }
-    
-    return INITIAL_MATCHES.map(m => {
-      if (!m.startingPreMatchProbs) {
-        return {
-          ...m,
-          startingPreMatchProbs: uzyskaj_pre_match_proby(m)
-        };
-      }
-      return m;
-    });
+    // Domyślnie czysta, pusta lista bez losowych zaślepek
+    return [];
   });
+
 
 
   const [bankrollSettings, setBankrollSettings] = useState<BankrollSettings>(() => {
@@ -224,13 +212,10 @@ export default function App() {
     }
   };
 
-  // Automatyczne pobranie dzisiejszych realnych meczów przy starcie aplikacji
-  useEffect(() => {
-    handleFetchRealMatches();
-  }, []);
-
+  // Całkowicie wyłączony autoload na starcie - dane pobierane wyłącznie na żądanie użytkownika
 
   const handleTriggerAiAnalysis = async (matchId: string) => {
+
     const targetMatch = matches.find(m => m.id === matchId);
     if (!targetMatch) return;
     setAnalyzingMatchId(matchId);
@@ -316,26 +301,53 @@ export default function App() {
                       <MatchPitchStats match={selectedMatch} />
                     </div>
                   ) : (
-                    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-12 text-center text-slate-400 space-y-3">
-                      <p className="text-sm">Brak meczów na liście do analizy.</p>
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={handleRestoreDefaultMatches}
-                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Przywróć domyślne mecze</span>
-                        </button>
+                    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-8 sm:p-12 text-center text-slate-400 space-y-4 shadow-xl">
+                      <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mx-auto mb-2">
+                        <Radio className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-slate-100">Brak Aktywnych Meczów w Panelu</h3>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
+                          Dodaj nowy mecz ręcznie z formularza lub pobierz bieżące spotkania z zewnętrznego API piłkarskiego.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap justify-center gap-2.5 pt-2">
                         <button
                           onClick={() => setShowAddMatchModal(true)}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-emerald-950/40"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          <Plus className="w-4 h-4" />
                           <span>Dodaj mecz ręcznie</span>
+                        </button>
+                        <button
+                          onClick={handleFetchRealMatches}
+                          disabled={fetchingReal}
+                          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-lg shadow-sky-950/40 disabled:opacity-50"
+                        >
+                          {fetchingReal ? (
+                            <>
+                              <RotateCcw className="w-4 h-4 animate-spin text-sky-200" />
+                              <span>Pobieranie z API...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Radio className="w-4 h-4 text-sky-200" />
+                              <span>Pobierz mecze z API</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleRestoreDefaultMatches}
+                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Wczytaj przykładowe</span>
                         </button>
                       </div>
                     </div>
                   )}
+
                 </div>
 
                 {/* PRAWA STRONA: ZŁOTE OKNO OBSTAWIANIA + KOMPAKTOWA LISTA MECZÓW (5 kolumn) */}
@@ -634,7 +646,9 @@ export default function App() {
         isOpen={showAddMatchModal}
         onClose={() => setShowAddMatchModal(false)}
         onAddMatch={handleAddCustomMatch}
+        apiKey={footballApiKey}
       />
+
 
       {/* Centrum Powiadomień Live (Dzwonek / Czerwona 3) */}
       <NotificationCenterModal
