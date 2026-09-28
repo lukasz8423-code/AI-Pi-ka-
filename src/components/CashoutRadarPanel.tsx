@@ -29,7 +29,7 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
   const [manualPayout, setManualPayout] = useState<number | ''>('');
   const [manualCashout, setManualCashout] = useState<number | ''>('');
 
-  // Znajdujemy początkowy kurs zakupu z historii lub zarejestrowanego zakłądu
+  // Znajdujemy początkowy kurs zakupu z historii lub zarejestrowanego zakładu
   const initialEntry = oddsHistory && oddsHistory.length > 0 ? oddsHistory[0] : null;
   const initialOdd = betPlaced?.odd || kursZalecany || (
     typZalecany?.includes('Gospodarz') ? (initialEntry?.kurs1 || kurs1) :
@@ -70,7 +70,7 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
   // Kalkulacja Szacowanej Wartości Cashoutu (% pierwotnej wygranej)
   let estimatedCashoutPct = 0;
   if (isCurrentlyWinning && currentLiveOdd > 0) {
-    const rawRatio = (initialOdd / Math.max(1.01, currentLiveOdd)) * 0.90;
+    const rawRatio = (initialOdd / Math.max(1.01, currentLiveOdd)) * 0.92;
     const timeProgress = Math.min(1, minuta / 90);
     const timeMultiplier = 0.5 + (timeProgress * 0.5);
     estimatedCashoutPct = Math.min(98, Math.max(10, Math.round(rawRatio * timeMultiplier * 100)));
@@ -79,9 +79,10 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
     estimatedCashoutPct = Math.min(45, Math.max(5, Math.round(ratio * 35)));
   }
 
-  const stake = betPlaced?.stake || 100;
-  const maxPayout = Math.round(stake * initialOdd);
-  const cashoutValuePLN = Math.round((maxPayout * estimatedCashoutPct) / 100);
+  // Realistyczna stawka dostosowana do budżetu 50 PLN (domyślnie 5 PLN zamiast 100 PLN!)
+  const stake = betPlaced?.stake || 5.00;
+  const maxPayout = Math.round(stake * initialOdd * 100) / 100;
+  const cashoutValuePLN = Math.min(maxPayout * 0.98, Math.round((maxPayout * estimatedCashoutPct) / 100 * 100) / 100);
 
   // Rekomendacja Cashoutu dla automatycznego radaru
   let recommendation: 'LOCK_PROFIT' | 'HOLD' | 'STOP_LOSS' | 'WAIT' = 'WAIT';
@@ -95,7 +96,7 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
         recommendation = 'LOCK_PROFIT';
         recTitle = 'ZAMKNIJ ZAKŁAD NOW! (Zamroź Zysk 🔒)';
         recColor = 'border-emerald-500/50 bg-emerald-950/40 text-emerald-300 shadow-lg shadow-emerald-950/50';
-        recReason = `Gwarantowany zysk wynoszący ok. ${estimatedCashoutPct}% wygranej (${cashoutValuePLN} PLN)! Ze względu na rosnącą dynamikę w ${minuta}'. minucie, zamknij kupon i wyeliminuj ryzyko utraty wygranej w doliczonym czasie.`;
+        recReason = `Gwarantowany zysk wynoszący ok. ${estimatedCashoutPct}% wygranej (${cashoutValuePLN.toFixed(2)} PLN z postawionych ${stake.toFixed(2)} PLN)! Ze względu na rosnącą dynamikę w ${minuta}'. minucie, zamknij kupon i wyeliminuj ryzyko utraty wygranej.`;
       } else {
         recommendation = 'HOLD';
         recTitle = 'TRZYMAJ ZAKŁAD (Czekaj na wyższy Cashout)';
@@ -113,216 +114,135 @@ export const CashoutRadarPanel: React.FC<CashoutRadarPanelProps> = ({ match }) =
       recommendation = 'STOP_LOSS';
       recTitle = 'EWAKUACJA / STOP LOSS ⚠️';
       recColor = 'border-rose-500/50 bg-rose-950/40 text-rose-300';
-      recReason = `Wynik meczu (${gole1}:${gole2}) jest niekorzystny. Zamiast czekać na całkowitą stratę stawki, rozważ odzyskanie części środków (Cashout ${cashoutValuePLN} PLN).`;
+      recReason = `Wynik meczu (${gole1}:${gole2}) jest niekorzystny. Zamiast czekać na całkowitą stratę stawki, rozważ odzyskanie części środków (Cashout ${cashoutValuePLN.toFixed(2)} PLN).`;
     }
   }
 
   // --- OBLICZENIA DLA MANUALEGO KALKULATORA "CASHOUT ROŚNIE" ---
-  const stakeVal = manualStake === '' ? 0 : manualStake;
-  const payoutVal = manualPayout === '' ? 0 : manualPayout;
-  const cashoutVal = manualCashout === '' ? 0 : manualCashout;
+  const calcStakeNum = typeof manualStake === 'number' ? manualStake : (stake || 10);
+  const calcPayoutNum = typeof manualPayout === 'number' ? manualPayout : (maxPayout || 20);
+  const calcCashoutNum = typeof manualCashout === 'number' ? manualCashout : (cashoutValuePLN || 12);
 
-  const manualProfitPLN = Math.round(cashoutVal - stakeVal);
-  const manualProfitPct = stakeVal > 0 ? Math.round((manualProfitPLN / stakeVal) * 100) : 0;
-  const manualCoveragePct = payoutVal > 0 ? Math.round((cashoutVal / payoutVal) * 100) : 0;
-
-  // Matematyczna ocena opłacalności zamknięcia na żywo
-  const currentWinProb = typZalecany?.includes('Gospodarz') ? fairProbs.p1 : typZalecany?.includes('Gość') ? fairProbs.p2 : fairProbs.px;
-  const expectedHoldValue = Math.round(payoutVal * currentWinProb);
-  const holdVsCashoutDiff = cashoutVal - expectedHoldValue;
+  const profitIfCashout = calcCashoutNum - calcStakeNum;
+  const profitIfFullWin = calcPayoutNum - calcStakeNum;
+  const cashoutVsFullPct = calcPayoutNum > 0 ? Math.round((calcCashoutNum / calcPayoutNum) * 100) : 0;
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-md space-y-3 min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1.5 rounded-lg bg-emerald-950 border border-emerald-800 text-emerald-400 shrink-0">
-            <DollarSign className="w-4 h-4" />
+    <div className="bg-[#0b131e] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+      {/* Nagłówek Radar Cashoutu */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <DollarSign className="w-4 h-4 font-bold" />
           </div>
-          <div className="min-w-0">
-            <h3 className="text-xs font-display font-bold text-slate-100 flex items-center gap-1.5 flex-wrap">
-              <span>Radar Cashout</span>
-              <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-emerald-400 font-mono">
-                Auto + STS
-              </span>
+          <div>
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+              <span>Radar Cashoutu & Zamrażanie Zysku</span>
             </h3>
-            <p className="text-[10px] text-slate-400 font-sans truncate">
-              Dynamiczny asystent wzrostu Cashoutu
+            <p className="text-[11px] text-slate-400">
+              Analiza optymalnego momentu wyjścia z zakładu (Stop Loss / Lock Profit)
             </p>
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <span className="text-[9px] font-mono text-slate-400 block">Status Kuponu</span>
-          <span className={`text-[11px] font-bold font-mono ${isCurrentlyWinning ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {isCurrentlyWinning ? 'WYGRYWA 🟢' : 'NIESPRZYJAJĄCY 🟡'}
+
+        <button
+          type="button"
+          onClick={() => setShowManualCalc(!showManualCalc)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-sky-400 hover:text-sky-300 transition cursor-pointer bg-sky-950/60 border border-sky-800/60 px-2.5 py-1 rounded-lg"
+        >
+          <Calculator className="w-3.5 h-3.5" />
+          <span>{showManualCalc ? 'Ukryj kalkulator' : 'Kalkulator własny'}</span>
+        </button>
+      </div>
+
+      {/* 1. Glówna Rekomendacja Radaru */}
+      <div className={`p-4 rounded-xl border ${recColor} space-y-2 transition-all`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-amber-400 animate-pulse" />
+            <h4 className="text-xs font-bold uppercase tracking-wider">{recTitle}</h4>
+          </div>
+          <span className="text-[11px] font-mono font-bold bg-slate-950/80 px-2 py-0.5 rounded border border-slate-700">
+            Szacowany Cashout: {estimatedCashoutPct}% Wygranej
           </span>
+        </div>
+        <p className="text-xs leading-relaxed font-sans opacity-90">{recReason}</p>
+      </div>
+
+      {/* 2. Podsumowanie Wskaźników Finansowych (Na żywo) */}
+      <div className="grid grid-cols-3 gap-2.5 bg-slate-950 p-3 rounded-xl border border-slate-850 text-center">
+        <div>
+          <span className="block text-[10px] text-slate-400 uppercase font-bold">Stawka Kuponu</span>
+          <span className="text-xs font-mono font-bold text-slate-200">{stake.toFixed(2)} PLN</span>
+        </div>
+        <div className="border-x border-slate-800">
+          <span className="block text-[10px] text-slate-400 uppercase font-bold">Max Wygrana</span>
+          <span className="text-xs font-mono font-bold text-slate-200">{maxPayout.toFixed(2)} PLN</span>
+        </div>
+        <div>
+          <span className="block text-[10px] text-emerald-400 uppercase font-bold">Oferta Cashout</span>
+          <span className="text-xs font-mono font-black text-emerald-400">{cashoutValuePLN.toFixed(2)} PLN</span>
         </div>
       </div>
 
-      {/* Przycisk: CASHOUT ROŚNIE (STS) */}
-      <button
-        onClick={() => setShowManualCalc(!showManualCalc)}
-        className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-between gap-2 shadow-md transition-all border border-emerald-400/30 active:scale-[0.99] cursor-pointer"
-      >
-        <span className="flex items-center gap-1.5 min-w-0 text-left">
-          <Flame className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
-          <span className="truncate">Cashout rośnie na STS? Sprawdź opłacalność!</span>
-        </span>
-        <span className="flex items-center gap-1 text-[11px] bg-black/30 px-2 py-0.5 rounded font-mono shrink-0">
-          <Calculator className="w-3.5 h-3.5" />
-          {showManualCalc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </span>
-      </button>
-
-      {/* FORMULARZ MANUALNEGO KALKULATORA "CASHOUT ROŚNIE" */}
+      {/* 3. Interaktywny Kalkulator Manualny (Rośnie Cashout) */}
       {showManualCalc && (
-        <div className="p-3 bg-slate-950 rounded-xl border border-emerald-500/30 space-y-3 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 font-display">
-              <Calculator className="w-4 h-4" />
-              <span>Kalkulator Ofert Cashout (STS / Fortuna / Betclic)</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">Minuta: {minuta}'</span>
-          </div>
+        <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-3 animate-fadeIn">
+          <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+            <Calculator className="w-3.5 h-3.5 text-sky-400" />
+            <span>Kalkulator własnego kuponu / Innego bukmachera</span>
+          </h4>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-[10px] text-slate-400 font-medium block mb-1">
-                Stawka Kuponu (PLN)
-              </label>
+              <label className="block text-[10px] text-slate-400 font-bold mb-1">Twoja Stawka (PLN)</label>
               <input
                 type="number"
+                min="1"
                 value={manualStake}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setManualStake(val === '' ? '' : Math.max(0, Number(val)));
-                }}
-                className="w-full bg-slate-900 border border-slate-750 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:border-emerald-500 focus:outline-none"
-                placeholder="100"
+                onChange={(e) => setManualStake(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="np. 10"
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono outline-none focus:border-sky-500"
               />
             </div>
             <div>
-              <label className="text-[10px] text-slate-400 font-medium block mb-1">
-                Maks. Wygrana (PLN)
-              </label>
+              <label className="block text-[10px] text-slate-400 font-bold mb-1">Ewentualna Wygrana (PLN)</label>
               <input
                 type="number"
+                min="1"
                 value={manualPayout}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setManualPayout(val === '' ? '' : Math.max(0, Number(val)));
-                }}
-                className="w-full bg-slate-900 border border-slate-750 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:border-emerald-500 focus:outline-none"
-                placeholder="300"
+                onChange={(e) => setManualPayout(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="np. 25"
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono outline-none focus:border-sky-500"
               />
             </div>
             <div>
-              <label className="text-[10px] text-slate-400 font-medium block mb-1 text-emerald-400 font-bold">
-                Obecny Cashout STS (PLN)
-              </label>
+              <label className="block text-[10px] text-emerald-400 font-bold mb-1">Obecna Oferta Cashout</label>
               <input
                 type="number"
+                min="0"
                 value={manualCashout}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setManualCashout(val === '' ? '' : Math.max(0, Number(val)));
-                }}
-                className="w-full bg-emerald-950/60 border border-emerald-500/60 rounded-lg px-2.5 py-1.5 text-xs text-emerald-200 font-mono font-bold focus:border-emerald-400 focus:outline-none"
-                placeholder="220"
+                onChange={(e) => setManualCashout(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="np. 18"
+                className="w-full bg-slate-900 border border-emerald-900/60 rounded-lg px-2.5 py-1.5 text-xs text-emerald-300 font-mono outline-none focus:border-emerald-500"
               />
             </div>
           </div>
 
-          {/* Podsumowanie Analityczne ze Wskaźnikami */}
-          <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800/80 flex flex-wrap justify-between items-center gap-2 text-xs">
             <div>
-              <span className="text-[10px] text-slate-400 block font-sans">Gwarantowany Zysk</span>
-              <strong className={`font-mono text-xs font-bold ${manualProfitPLN >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {manualProfitPLN >= 0 ? `+${manualProfitPLN} PLN` : `${manualProfitPLN} PLN`} ({manualProfitPct}%)
+              <span className="text-slate-400 font-sans">Zysk z Cashoutu: </span>
+              <strong className={profitIfCashout >= 0 ? 'text-emerald-400 font-mono' : 'text-rose-400 font-mono'}>
+                {profitIfCashout >= 0 ? `+${profitIfCashout.toFixed(2)} PLN` : `${profitIfCashout.toFixed(2)} PLN`}
               </strong>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 block font-sans">Pokrycie Wygranej</span>
-              <strong className="font-mono text-xs text-cyan-300 font-bold">
-                {manualCoveragePct}% wygranej
-              </strong>
+              <span className="text-slate-400 font-sans">Odbierasz: </span>
+              <strong className="text-sky-300 font-mono">{cashoutVsFullPct}% pełnej wygranej</strong>
             </div>
-            <div>
-              <span className="text-[10px] text-slate-400 block font-sans">EV Mat. Kuponu</span>
-              <strong className="font-mono text-xs text-amber-300 font-bold">
-                {expectedHoldValue} PLN
-              </strong>
-            </div>
-          </div>
-
-          {/* Rekomendacja z Decyzją */}
-          <div className={`p-2.5 rounded-lg border text-xs font-sans space-y-1 ${
-            holdVsCashoutDiff >= -15 || (minuta >= 70 && manualCoveragePct >= 75)
-              ? 'bg-emerald-950/50 border-emerald-500/50 text-emerald-200'
-              : 'bg-blue-950/40 border-blue-500/40 text-blue-200'
-          }`}>
-            <div className="font-bold flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
-              <span>
-                {manualCoveragePct >= 75 && minuta >= 70
-                  ? 'ZAMKNIJ CASH OUT NOW! 🔒 (Zabezpiecz Zysk)'
-                  : manualProfitPLN > 0
-                  ? 'Gwarantowany Zysk! (Sprawdź presję rywala przed decyzją)'
-                  : 'Czekaj na wyższą kwotę Cashout'}
-              </span>
-            </div>
-            <p className="text-[11px] opacity-90 leading-relaxed">
-              {manualCoveragePct >= 75
-                ? `Obecna oferta STS zaspokaja aż ${manualCoveragePct}% maksymalnej wygranej (${manualCashout} PLN z ${manualPayout} PLN). W ${minuta}'. minucie zamrożenie zysku eliminuję ryzyko bramki w doliczonym czasie!`
-                : `Oferta daje ${manualProfitPLN >= 0 ? `+${manualProfitPLN} PLN zysku` : 'częściowy zwrot'}. Prawdopodobieństwo powodzenia typu wynosi obecnie ${Math.round(currentWinProb * 100)}%.`}
-            </p>
           </div>
         </div>
       )}
-
-      {/* Wskaźniki Szacunkowego Cashoutu Automatycznego */}
-      <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-        <div>
-          <span className="text-[10px] text-slate-400 font-sans block">Kurs Wejścia</span>
-          <strong className="text-xs font-mono text-slate-200">{initialOdd.toFixed(2)}</strong>
-        </div>
-        <div>
-          <span className="text-[10px] text-slate-400 font-sans block">Kurs Live</span>
-          <strong className="text-xs font-mono text-emerald-400">{currentLiveOdd.toFixed(2)}</strong>
-        </div>
-        <div>
-          <span className="text-[10px] text-slate-400 font-sans block">Szacowany Cashout</span>
-          <strong className="text-xs font-mono text-emerald-300">{estimatedCashoutPct}% ({cashoutValuePLN} PLN)</strong>
-        </div>
-      </div>
-
-      {/* Pasek postępu Cashoutu */}
-      <div className="space-y-1">
-        <div className="flex justify-between items-center text-[11px] text-slate-400">
-          <span>Stosunek Zysku Cashoutu:</span>
-          <span className="font-mono text-emerald-400 font-bold">{cashoutValuePLN} z {maxPayout} PLN max</span>
-        </div>
-        <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-          <div 
-            className={`h-full transition-all duration-500 ${isCurrentlyWinning ? 'bg-gradient-to-r from-emerald-500 to-cyan-400' : 'bg-amber-500'}`}
-            style={{ width: `${Math.max(5, estimatedCashoutPct)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Box rekomendacji Cashout */}
-      <div className={`p-3 rounded-lg border text-xs space-y-1 ${recColor}`}>
-        <div className="font-bold font-display flex items-center gap-1.5">
-          {recommendation === 'LOCK_PROFIT' && <Lock className="w-4 h-4 text-emerald-400 animate-bounce" />}
-          {recommendation === 'HOLD' && <TrendingUp className="w-4 h-4 text-blue-400" />}
-          {recommendation === 'STOP_LOSS' && <AlertTriangle className="w-4 h-4 text-rose-400" />}
-          {recommendation === 'WAIT' && <RefreshCw className="w-4 h-4 text-slate-400" />}
-          <span>{recTitle}</span>
-        </div>
-        <p className="text-[11px] font-sans leading-relaxed opacity-90">
-          {recReason}
-        </p>
-      </div>
     </div>
   );
 };
-

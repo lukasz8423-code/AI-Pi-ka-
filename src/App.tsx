@@ -10,6 +10,8 @@ import { LivePitchMap } from './components/LivePitchMap';
 import { MatchPitchStats } from './components/MatchPitchStats';
 import { GoldenBettingHero } from './components/GoldenBettingHero';
 import { CompactMatchListView } from './components/CompactMatchListView';
+import { MasterSummaryWidget } from './components/MasterSummaryWidget';
+import { EditMatchModal } from './components/EditMatchModal';
 
 import AnalysisPanel from './components/AnalysisPanel';
 import StatsHistory from './components/StatsHistory';
@@ -51,8 +53,6 @@ export default function App() {
     return [];
   });
 
-
-
   const [bankrollSettings, setBankrollSettings] = useState<BankrollSettings>(() => {
     const defaultBankroll: BankrollSettings = {
       initial: 50.00,
@@ -64,7 +64,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          // Reset / sanitacja starych wartości (takich jak 1000, 14110 zł)
+          // Reset / sanitacja starych wartości
           const isOldOrInvalid = !parsed.initial || parsed.initial === 1000 || parsed.initial >= 10000;
           return {
             initial: isOldOrInvalid ? 50.00 : Number(parsed.initial),
@@ -91,11 +91,13 @@ export default function App() {
   const [analyzingMatchId, setAnalyzingMatchId] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showAddMatchModal, setShowAddMatchModal] = useState(false);
+  const [editingMatch, setEditingMatch] = useState<LiveMatch | null>(null);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   
   // Real API integration
   const [fetchingReal, setFetchingReal] = useState(false);
+  const [fetchApiError, setFetchApiError] = useState<string | null>(null);
   const [apiFetchedMatches, setApiFetchedMatches] = useState<LiveMatch[]>([]);
   const [lastFetched, setLastFetched] = useState<string | null>(() => {
     return localStorage.getItem('asystent_live_bet_last_fetched') || null;
@@ -120,7 +122,7 @@ export default function App() {
 
   // Pobranie bieżącego salda
   const currentBalance = useMemo(() => {
-    let bal = bankrollSettings.initial;
+    let bal = bankrollSettings.initial || 50.00;
     try {
       const resolved = matches.filter(m => m.status === 'wygrany' || m.status === 'przegrany');
       resolved.forEach(m => {
@@ -181,68 +183,62 @@ export default function App() {
     });
   };
 
-  const [fetchApiError, setFetchApiError] = useState<string | null>(null);
-
   const handleFetchRealMatches = async () => {
-    if (fetchingReal) return;
     setFetchingReal(true);
     setFetchApiError(null);
     try {
-      const result = await fetchRealMatchesSafe(footballApiKey, true);
-      if (result.matches && result.matches.length > 0) {
-        setApiFetchedMatches(result.matches);
+      const res = await fetchRealMatchesSafe(footballApiKey);
+      if (res.error) {
+        setFetchApiError(res.error);
+      }
+      if (res.matches && res.matches.length > 0) {
+        setApiFetchedMatches(res.matches);
         setMatches(prev => {
-          // Łączymy mecze z API tak, aby nowe realne mecze były na górze listy
-          const apiIds = new Set(result.matches.map(m => m.id));
-          const existingNonApi = prev.filter(m => !apiIds.has(m.id) && m.id !== 'montevideo-match-74');
-          const combined = [...result.matches, ...existingNonApi];
+          const existingIds = new Set(prev.map(m => m.id));
+          const newToAdd = res.matches.filter(m => !existingIds.has(m.id));
+          const combined = [...prev, ...newToAdd];
           return combined;
         });
-
-        if (result.matches[0]) {
-          setSelectedMatchId(result.matches[0].id);
+        if (!selectedMatchId && res.matches.length > 0) {
+          setSelectedMatchId(res.matches[0].id);
         }
-
-        const timeStr = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setLastFetched(timeStr);
-        localStorage.setItem('asystent_live_bet_last_fetched', timeStr);
-      } else {
-        setFetchApiError(result.error || 'Brak dostępnych meczów z API na ten moment.');
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastFetched(nowStr);
+        localStorage.setItem('asystent_live_bet_last_fetched', nowStr);
       }
-    } catch (err: any) {
-      setFetchApiError(err.message || 'Błąd podczas pobierania danych z API.');
+    } catch (e: any) {
+      setFetchApiError(e.message || "Błąd pobierania danych z API");
     } finally {
       setFetchingReal(false);
     }
   };
 
-
-  // Całkowicie wyłączony autoload na starcie - dane pobierane wyłącznie na żądanie użytkownika
-
   const handleTriggerAiAnalysis = async (matchId: string) => {
+    const m = matches.find(item => item.id === matchId);
+    if (!m) return;
 
-    const targetMatch = matches.find(m => m.id === matchId);
-    if (!targetMatch) return;
     setAnalyzingMatchId(matchId);
     setAiError(null);
+
     try {
-      const { analysis, error } = await fetchAiAnalysisSafe(targetMatch);
-      if (error) {
-        setAiError(error);
-      } else if (analysis) {
-        handleUpdateMatch({
-          ...targetMatch,
-          aiAnaliza: analysis
-        });
-      }
-    } catch (e: any) {
-      setAiError(e.message || "Błąd generowania analizy AI");
+      const analysis = await fetchAiAnalysisSafe(m, footballApiKey);
+      const textResult = analysis.analysis || analysis.error || 'Brak analizy AI';
+      setMatches(prev => prev.map(item => {
+        if (item.id === matchId) {
+          return {
+            ...item,
+            aiAnaliza: textResult
+          };
+        }
+        return item;
+      }));
+    } catch (err: any) {
+      setAiError(err.message || 'Błąd generowania analizy Gemini AI.');
     } finally {
       setAnalyzingMatchId(null);
     }
   };
 
-  // Dynamiczne wyliczanie rzeczywistych alertów i powiadomień ze stanu meczów
   const activeAlerts = useMemo(() => generateMatchAlerts(matches), [matches]);
   const activeNotificationsCount = activeAlerts.length;
 
@@ -270,7 +266,6 @@ export default function App() {
           balance={currentBalance}
         />
 
-
         {/* Zawartość zależna od wybranej zakładki */}
         <main className="flex-1 p-4 sm:p-6 max-w-[1600px] w-full mx-auto space-y-6">
           {/* Inteligentne Powiadomienia w tle */}
@@ -282,6 +277,19 @@ export default function App() {
 
           {currentTab === 'dashboard' && (
             <div className="space-y-6">
+              {/* GŁÓWNY PANEL PODSUMOWUJĄCY (MASTER SUMMARY WIDGET) NA SAMEJ GÓRZE DASHBOARDU */}
+              {selectedMatch && (
+                <MasterSummaryWidget
+                  match={selectedMatch}
+                  bankrollSettings={bankrollSettings}
+                  matches={matches}
+                  onUpdateMatch={handleUpdateMatch}
+                  onOpenEditModal={(m) => setEditingMatch(m)}
+                  onTriggerAiAnalysis={handleTriggerAiAnalysis}
+                  isAiLoading={analyzingMatchId === selectedMatch.id}
+                />
+              )}
+
               {/* Główny układ Dashboardu z podziałem na Main Match View i Złote Okno Obstawiania */}
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
                 {/* SEKCJA ANALIZY MECZU (Środek / Lewo w Gridzie: 7 kolumn) */}
@@ -306,7 +314,11 @@ export default function App() {
                   {selectedMatch ? (
                     <div className="space-y-4 animate-fadeIn">
                       {/* Live Match Map - 2D Boisko piłkarskie ze strefami taktycznymi */}
-                      <LivePitchMap match={selectedMatch} onDeleteMatch={handleDeleteMatch} />
+                      <LivePitchMap 
+                        match={selectedMatch} 
+                        onDeleteMatch={handleDeleteMatch}
+                        onEditMatch={(m) => setEditingMatch(m)}
+                      />
 
                       {/* Miniatura statystyk (Possession, Pressure Index, Shots, Line of Stagnation, Wave Timeline) */}
                       <MatchPitchStats match={selectedMatch} />
@@ -365,7 +377,6 @@ export default function App() {
                     </div>
                   )}
 
-
                 </div>
 
                 {/* PRAWA STRONA: ZŁOTE OKNO OBSTAWIANIA + KOMPAKTOWA LISTA MECZÓW (5 kolumn) */}
@@ -387,6 +398,7 @@ export default function App() {
                     pinnedMatchIds={pinnedMatchIds}
                     onSelectMatch={handleSelectMatch}
                     onDeleteMatch={handleDeleteMatch}
+                    onEditMatch={(m) => setEditingMatch(m)}
                     onFetchRealMatches={handleFetchRealMatches}
                     fetchingReal={fetchingReal}
                     onOpenAddMatchModal={() => setShowAddMatchModal(true)}
@@ -448,184 +460,31 @@ export default function App() {
             </div>
           )}
 
-          {/* Zakładka: Filtry / Wszystkie mecze */}
-          {currentTab === 'filtry' && (
-            <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-4 animate-fadeIn">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                  <SlidersHorizontal className="w-5 h-5 text-sky-400" />
-                  <span>Zarządzanie Meczami i Filtrami ({matches.length})</span>
-                </h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowAddMatchModal(true)}
-                    className="bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Dodaj mecz</span>
-                  </button>
-                  <button
-                    onClick={handleFetchRealMatches}
-                    disabled={fetchingReal}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
-                  >
-                    {fetchingReal ? 'Pobieranie...' : 'Pobierz z API'}
-                  </button>
-                </div>
-              </div>
-
-              {matches.length === 0 ? (
-
-                <div className="text-center py-12 text-slate-400">
-                  <p className="text-sm">Brak meczów na liście.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {matches.map(m => (
-                    <div
-                      key={m.id}
-                      onClick={() => {
-                        setSelectedMatchId(m.id);
-                        setCurrentTab('dashboard');
-                      }}
-                      className="bg-[#0e1724] border border-slate-800 hover:border-sky-500 p-4 rounded-xl cursor-pointer transition shadow-md relative group"
-                    >
-                      <div className="flex justify-between items-center text-xs text-slate-400 mb-2 font-mono">
-                        <span className="text-emerald-400 font-bold">Minuta {m.minuta}'</span>
-                        <div className="flex items-center gap-2">
-                          <span>@{m.kursZalecany || m.kurs1}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteMatch(m.id, e)}
-                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/60 rounded-md transition cursor-pointer"
-                            title="Usuń mecz z listy"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="text-sm font-bold text-slate-100">{m.gospodarz} {m.gole1} : {m.gole2} {m.gosc}</div>
-                      <div className="text-xs text-slate-400 mt-2 line-clamp-2">{m.notatki || 'Brak notatek'}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Zakładka: Morning / Live Monitoring */}
-          {currentTab === 'morning' && (
-            <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-4 animate-fadeIn">
-              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
-                Live Match Tracker & Monitoring Poranny
-              </h2>
-              <p className="text-xs text-slate-400">
-                Wszystkie aktywne spotkania monitorowane w czasie rzeczywistym przez algorytm wykrywania Złotych Okien.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {matches.filter(m => m.status === 'niesprawdzony').map(m => (
-                  <div
-                    key={m.id}
-                    onClick={() => {
-                      setSelectedMatchId(m.id);
-                      setCurrentTab('dashboard');
-                    }}
-                    className="p-4 rounded-xl bg-[#0e1724] border border-slate-800 hover:border-emerald-500/70 transition cursor-pointer"
-                  >
-                    <div className="flex justify-between text-xs text-emerald-400 font-bold mb-2">
-                      <span>LIVE {m.minuta}'</span>
-                      <span className="text-slate-300">EV: {((m.evZalecane || 0.05) * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="text-sm font-bold text-slate-200">{m.gospodarz} vs {m.gosc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Zakładka: Settings / Bankroll & Config */}
-          {currentTab === 'settings' && (
-            <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-6 animate-fadeIn max-w-2xl">
-              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-sky-400" />
-                Ustawienia Bankrollu & Strategii Stawek
-              </h2>
-
-              <div className="space-y-4 bg-[#0e1724] p-5 rounded-xl border border-slate-800">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300">Kapitał początkowy (PLN):</label>
-                  <input
-                    type="number"
-                    value={bankrollSettings.initial}
-                    onChange={(e) => setBankrollSettings(prev => ({ ...prev, initial: Math.max(10, parseFloat(e.target.value) || 1000) }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300">Strategia doboru stawki:</label>
-                  <select
-                    value={bankrollSettings.strategy}
-                    onChange={(e) => setBankrollSettings(prev => ({ ...prev, strategy: e.target.value as any }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500"
-                  >
-                    <option value="percent">Procent kapitału (%)</option>
-                    <option value="kelly">Kryterium Kelly'ego (Fractional)</option>
-                    <option value="flat">Stała stawka kwotowa (PLN)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300">
-                    {bankrollSettings.strategy === 'percent' ? 'Procent bankrollu na zakład (%)' : bankrollSettings.strategy === 'kelly' ? 'Mnożnik ułamkowy Kelly (np. 0.5 lub 1)' : 'Stała stawka (PLN)'}:
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={bankrollSettings.parameter}
-                    onChange={(e) => setBankrollSettings(prev => ({ ...prev, parameter: Math.max(0.1, parseFloat(e.target.value) || 2) }))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500 font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
         </main>
       </div>
 
-      {/* Modal konfiguracji klucza API */}
+      {/* MODAL EDYCYJNY KLUCZA API */}
       {showApiModal && (
-        <div 
-          className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn"
-          onClick={() => setShowApiModal(false)}
-        >
-          <div 
-            className="bg-[#0b131e] border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl relative z-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                <Key className="w-5 h-5 text-amber-500" />
-                Konfiguracja API Meczów Live
-              </h3>
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#0b131e] border border-slate-850 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-slate-850 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-slate-100">Klucz API Football-Data.org</h3>
+              </div>
               <button
-                type="button"
                 onClick={() => setShowApiModal(false)}
-                className="text-slate-400 hover:text-slate-100 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-100 p-1 rounded-lg transition cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Wprowadź swój darmowy klucz API (np. z Football-Data.org lub API-Football), aby pobierać mecze z całego świata w czasie rzeczywistym.
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Wprowadź darmowy klucz z serwisów piłkarskich (np. football-data.org) aby pobierać rzeczywiste mecze na żywo.
               </p>
-
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  Klucz API (X-Auth-Token / X-API-Key):
-                </label>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Twój Klucz API:</label>
                 <input
                   type="text"
                   value={footballApiKey}
@@ -660,8 +519,15 @@ export default function App() {
         apiKey={footballApiKey}
       />
 
+      {/* Modal edycji istniejącego meczu */}
+      <EditMatchModal
+        isOpen={Boolean(editingMatch)}
+        match={editingMatch}
+        onClose={() => setEditingMatch(null)}
+        onUpdateMatch={handleUpdateMatch}
+      />
 
-      {/* Centrum Powiadomień Live (Dzwonek / Czerwona 3) */}
+      {/* Centrum Powiadomień Live */}
       <NotificationCenterModal
         isOpen={showNotificationsModal}
         onClose={() => setShowNotificationsModal(false)}
@@ -670,7 +536,7 @@ export default function App() {
         selectedMatchId={selectedMatchId}
       />
 
-      {/* Modal profilu typera i zarządzania saldem bankrollu */}
+      {/* Modal profilu typera */}
       <UserProfileModal
         isOpen={showProfileModal}
         onClose={() => setShowProfileModal(false)}
