@@ -77,10 +77,11 @@ async function startServer() {
       }
 
       // Bezpieczna, leniwa inicjalizacja klucza API (lazy initialization)
-      const key = process.env.GEMINI_API_KEY;
+      const clientKey = (req.headers["x-gemini-key"] || req.headers["x-goog-api-key"] || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : "")) as string;
+      const key = (clientKey && clientKey.trim()) || process.env.GEMINI_API_KEY;
       if (!key) {
         return res.status(500).json({
-          error: "Klucz API 'GEMINI_API_KEY' nie jest skonfigurowany. Dodaj go w panelu Settings > Secrets w AI Studio."
+          error: "Klucz API 'GEMINI_API_KEY' nie jest skonfigurowany. Dodaj go w panelu Settings > Secrets w AI Studio lub przekaż w nagłówku zapytania."
         });
       }
 
@@ -145,12 +146,15 @@ async function startServer() {
   });
 
   // API do pobierania realnych meczów z dzisiejszego dnia (Football-Data.org lub API-Football / api-sports.io)
-  app.get("/api/real-matches", realMatchesLimiter, async (req, res) => {
+  app.all(["/api/real-matches", "/api/real-matches/"], realMatchesLimiter, async (req, res) => {
     try {
-      const userHeaderKey = req.headers["x-api-key"] || req.headers["x-auth-token"];
+      const userHeaderKey = req.headers["x-api-key"] || req.headers["x-auth-token"] || req.headers["authorization"] || req.query.apiKey || req.query.key || (req.body && req.body.apiKey);
       let key = "";
       if (userHeaderKey && typeof userHeaderKey === "string" && userHeaderKey.trim() !== "") {
         key = userHeaderKey.trim();
+        if (key.startsWith("Bearer ")) {
+          key = key.slice(7).trim();
+        }
       } else {
         key = (process.env.FOOTBALL_API_KEY || "").trim();
       }

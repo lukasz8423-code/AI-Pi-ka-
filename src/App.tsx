@@ -15,6 +15,7 @@ import AnalysisPanel from './components/AnalysisPanel';
 import StatsHistory from './components/StatsHistory';
 import AiAnalysisView from './components/AiAnalysisView';
 import IntelligentNotifications from './components/IntelligentNotifications';
+import { fetchRealMatchesSafe, fetchAiAnalysisSafe } from './utils/apiService';
 import { Key, X, Plus, ShieldCheck, Sparkles, SlidersHorizontal, BarChart3, Radio } from 'lucide-react';
 
 export default function App() {
@@ -157,27 +158,23 @@ export default function App() {
   };
 
   const handleFetchRealMatches = async () => {
+    if (fetchingReal) return;
     setFetchingReal(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (footballApiKey) headers['x-auth-token'] = footballApiKey;
-
-      const res = await fetch(`${baseUrl}/api/real-matches`, { headers });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      const data = await res.json();
-      if (Array.isArray(data.matches) && data.matches.length > 0) {
-        setApiFetchedMatches(data.matches);
+      const result = await fetchRealMatchesSafe(footballApiKey, true);
+      if (result.matches && result.matches.length > 0) {
+        setApiFetchedMatches(result.matches);
         setMatches(prev => {
           const ids = new Set(prev.map(m => m.id));
-          const newOnes = data.matches.filter((m: LiveMatch) => !ids.has(m.id));
+          const newOnes = result.matches.filter((m: LiveMatch) => !ids.has(m.id));
           return [...newOnes, ...prev];
         });
-        setLastFetched(new Date().toLocaleTimeString('pl-PL'));
-        localStorage.setItem('asystent_live_bet_last_fetched', new Date().toLocaleTimeString('pl-PL'));
+        const timeStr = new Date().toLocaleTimeString('pl-PL');
+        setLastFetched(timeStr);
+        localStorage.setItem('asystent_live_bet_last_fetched', timeStr);
       }
     } catch (err) {
-      console.error("Błąd pobierania z API:", err);
+      console.warn("Informacja o pobieraniu meczy:", err);
     } finally {
       setFetchingReal(false);
     }
@@ -189,22 +186,17 @@ export default function App() {
     setAnalyzingMatchId(matchId);
     setAiError(null);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-      const res = await fetch(`${baseUrl}/api/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ match: targetMatch })
-      });
-      if (!res.ok) throw new Error("Błąd AI");
-      const data = await res.json();
-      if (data.analysis) {
+      const { analysis, error } = await fetchAiAnalysisSafe(targetMatch);
+      if (error) {
+        setAiError(error);
+      } else if (analysis) {
         handleUpdateMatch({
           ...targetMatch,
-          aiAnaliza: data.analysis
+          aiAnaliza: analysis
         });
       }
     } catch (e: any) {
-      setAiError(e.message || "Błąd generowania analizy");
+      setAiError(e.message || "Błąd generowania analizy AI");
     } finally {
       setAnalyzingMatchId(null);
     }
