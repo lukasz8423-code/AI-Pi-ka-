@@ -8,7 +8,8 @@ import {
   zbuduj_prompt_panelu,
   oblicz_wartosci_zakladow,
   ocenWynikZalecanegoTypu,
-  uzyskaj_pre_match_proby
+  uzyskaj_pre_match_proby,
+  obliczStawke
 } from '../utils/bettingCalc';
 import { 
   Compass, Activity, Settings, Plus
@@ -26,6 +27,7 @@ import { CashoutRadarPanel } from './CashoutRadarPanel';
 
 interface AnalysisPanelProps {
   match: LiveMatch | null;
+  matches?: LiveMatch[];
   onUpdateMatch: (updated: LiveMatch) => void;
   onTriggerAiAnalysis: (prompt: string) => void;
   aiLoading: boolean;
@@ -36,6 +38,7 @@ interface AnalysisPanelProps {
 
 export default function AnalysisPanel({
   match,
+  matches,
   onUpdateMatch,
   onTriggerAiAnalysis,
   aiLoading,
@@ -109,64 +112,37 @@ export default function AnalysisPanel({
       
       let balance = bankrollSettings.initial;
       try {
-        const savedMatchesStr = localStorage.getItem('asystent_live_bet_matches');
-        if (savedMatchesStr) {
-          const allMatches = JSON.parse(savedMatchesStr) as LiveMatch[];
-          const resolvedMatches = allMatches
-            .filter(m => m.status !== 'niesprawdzony')
-            .sort((a, b) => a.dataDodania.localeCompare(b.dataDodania));
-            
-          resolvedMatches.forEach(m => {
-            const mOdd = m.kursZalecany || 1.8;
-            let mStake = 100;
-            if (m.betPlaced && m.betPlaced.stake) {
-              mStake = m.betPlaced.stake;
-            } else {
-              if (bankrollSettings.strategy === 'flat') {
-                mStake = bankrollSettings.parameter;
-              } else if (bankrollSettings.strategy === 'percent') {
-                mStake = Math.round((balance * bankrollSettings.parameter / 100) * 100) / 100;
-              } else if (bankrollSettings.strategy === 'kelly') {
-                const mEv = m.evZalecane !== undefined ? m.evZalecane : 0.05;
-                const p = (mEv + 1) / mOdd;
-                const q = 1 - p;
-                const bRatio = mOdd - 1;
-                const kellyFraction = bRatio > 0 ? (p * bRatio - q) / bRatio : 0;
-                const safeKelly = Math.max(0, Math.min(1, kellyFraction));
-                mStake = Math.round((balance * safeKelly * bankrollSettings.parameter) * 100) / 100;
-              }
-            }
-            if (mStake <= 0) mStake = 10;
-            if (mStake > balance) mStake = balance;
+        const allMatches = matches || [];
+        const resolvedMatches = allMatches
+          .filter(m => m.status !== 'niesprawdzony')
+          .sort((a, b) => a.dataDodania.localeCompare(b.dataDodania));
+          
+        resolvedMatches.forEach(m => {
+          const mOdd = m.kursZalecany || 1.8;
+          let mStake = 100;
+          if (m.betPlaced && m.betPlaced.stake) {
+            mStake = m.betPlaced.stake;
+          } else {
+            const mEv = m.evZalecane !== undefined ? m.evZalecane : 0.05;
+            mStake = obliczStawke(bankrollSettings.strategy, bankrollSettings.parameter, balance, mOdd, mEv);
+          }
+          if (mStake > balance) mStake = balance;
+          if (mStake > 0) {
             if (m.status === 'wygrany') {
               balance += mStake * (mOdd - 1);
             } else if (m.status === 'przegrany') {
               balance -= mStake;
             }
-          });
-        }
+          }
+        });
       } catch (err) {
         console.error("Error calculating balance in getSuggestedStake:", err);
       }
       
-      let suggestedStake = 100;
-      if (bankrollSettings.strategy === 'flat') {
-        suggestedStake = bankrollSettings.parameter;
-      } else if (bankrollSettings.strategy === 'percent') {
-        suggestedStake = Math.round((balance * bankrollSettings.parameter / 100) * 100) / 100;
-      } else if (bankrollSettings.strategy === 'kelly') {
-        const p = (ev + 1) / odd;
-        const q = 1 - p;
-        const bRatio = odd - 1;
-        const kellyFraction = bRatio > 0 ? (p * bRatio - q) / bRatio : 0;
-        const safeKelly = Math.max(0, Math.min(1, kellyFraction));
-        suggestedStake = Math.round((balance * safeKelly * bankrollSettings.parameter) * 100) / 100;
-      }
-      if (suggestedStake <= 0) suggestedStake = 10;
-      if (suggestedStake > balance) suggestedStake = balance;
-      return { stake: Math.round(suggestedStake * 100) / 100, balance: Math.round(balance * 100) / 100 };
+      const suggestedStake = obliczStawke(bankrollSettings.strategy, bankrollSettings.parameter, balance, odd, ev);
+      return { stake: suggestedStake, balance: Math.round(balance * 100) / 100 };
     };
-  }, [match?.id, bankrollSettings]);
+  }, [match?.id, bankrollSettings, matches]);
 
   // Obliczenia na żywo na podstawie aktualnego stanu wybranego meczu (zabezpieczone przed null)
   const probsRaw = match ? przelicz_prawdopodobienstwa(match.kurs1, match.kurs_x, match.kurs2) : null;

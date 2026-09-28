@@ -610,6 +610,14 @@ export default function MatchList({
                           <div className="text-xs font-semibold truncate text-slate-100 max-w-[110px] text-right">{m.gosc}</div>
                         </div>
 
+                        {m.daneSzacunkowe && (
+                          <div className="mt-1 mb-1.5 flex items-center justify-center">
+                            <span className="text-[8.5px] font-medium px-1.5 py-0.5 rounded bg-slate-900 text-amber-300/90 border border-slate-800" title="Kursy i statystyki meczu są wyliczone szacunkowo">
+                              kursy i statystyki szacunkowe
+                            </span>
+                          </div>
+                        )}
+
                         {m.typZalecany && (
                           <div className="mt-2 text-[10px] bg-amber-950/15 border border-amber-500/10 rounded-lg p-1.5 text-amber-200/90 text-center font-medium flex items-center justify-center gap-1">
                             <span>Sugerowany:</span>
@@ -767,6 +775,14 @@ export default function MatchList({
                       </div>
                       <div className="text-sm font-semibold truncate text-slate-100 max-w-[130px] text-right">{m.gosc}</div>
                     </div>
+
+                    {m.daneSzacunkowe && (
+                      <div className="mt-1 mb-1.5 flex items-center justify-center">
+                        <span className="text-[8.5px] font-medium px-1.5 py-0.5 rounded bg-slate-950 text-amber-300/90 border border-slate-800" title="Kursy i statystyki meczu są wyliczone szacunkowo">
+                          kursy i statystyki szacunkowe
+                        </span>
+                      </div>
+                    )}
 
                     {/* AI Prediction Section */}
                     {m.typZalecany && (

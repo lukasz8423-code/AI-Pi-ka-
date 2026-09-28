@@ -1,6 +1,47 @@
 import { Probabilities, ValueBet, MatchStats, PredictionResult, LiveMatch, OptimalEntryAssessment } from '../types';
 
 /**
+ * Oblicza sugerowaną stawkę na podstawie wybranej strategii zarządzania kapitałem (bankroll management).
+ */
+export function obliczStawke(
+  strategy: 'flat' | 'percent' | 'kelly',
+  parameter: number,
+  balance: number,
+  odd: number,
+  ev: number
+): number {
+  if (balance <= 0) return 0;
+
+  let stawka = 0;
+  if (strategy === 'flat') {
+    stawka = parameter;
+    if (stawka <= 0) stawka = 10;
+  } else if (strategy === 'percent') {
+    stawka = (balance * parameter) / 100;
+    if (stawka <= 0) stawka = 10;
+  } else if (strategy === 'kelly') {
+    const p = (ev + 1) / odd;
+    const q = 1 - p;
+    const b = odd - 1;
+    const kellyFraction = b > 0 ? (p * b - q) / b : 0;
+    const f = Math.max(0, Math.min(1, kellyFraction));
+    if (f <= 0) {
+      return 0;
+    }
+    stawka = balance * f * parameter;
+    if (stawka <= 0) {
+      return 0;
+    }
+  }
+
+  if (stawka > balance) {
+    stawka = balance;
+  }
+
+  return Math.round(stawka * 100) / 100;
+}
+
+/**
  * Przelicza kursy bukmacherskie na surowe i czyste prawdopodobieństwa (po odjęciu marży).
  */
 export function przelicz_prawdopodobienstwa(

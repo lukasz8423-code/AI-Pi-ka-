@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LiveMatch, BankrollSettings } from '../types';
+import { obliczStawke } from '../utils/bettingCalc';
 import { 
   Percent, TrendingUp, DollarSign, BarChart2, Zap, 
   Settings2, Calendar, Target, Award, ShieldAlert, Sparkles 
@@ -49,33 +50,21 @@ export default function StatsHistory({
     if (m.betPlaced && m.betPlaced.stake) {
       stake = m.betPlaced.stake;
     } else {
-      // Obliczanie stawki według wybranej strategii bankrollu
-      if (bankrollSettings.strategy === 'flat') {
-        stake = bankrollSettings.parameter;
-      } else if (bankrollSettings.strategy === 'percent') {
-        stake = Math.round((balance * bankrollSettings.parameter / 100) * 100) / 100;
-      } else if (bankrollSettings.strategy === 'kelly') {
-        const ev = m.evZalecane !== undefined ? m.evZalecane : 0.05;
-        const p = (ev + 1) / odd;
-        const q = 1 - p;
-        const bRatio = odd - 1;
-        const kellyFraction = bRatio > 0 ? (p * bRatio - q) / bRatio : 0;
-        const safeKelly = Math.max(0, Math.min(1, kellyFraction));
-        const fraction = safeKelly * bankrollSettings.parameter;
-        stake = Math.round((balance * fraction) * 100) / 100;
-      }
+      const ev = m.evZalecane !== undefined ? m.evZalecane : 0.05;
+      stake = obliczStawke(bankrollSettings.strategy, bankrollSettings.parameter, balance, odd, ev);
     }
     
-    if (stake <= 0) stake = 10; // minimalne zabezpieczenie stawki
     if (stake > balance) stake = balance; // limit do posiadanych środków
     
     let profit = 0;
-    if (m.status === 'wygrany') {
-      profit = stake * (odd - 1);
-      balance += profit;
-    } else if (m.status === 'przegrany') {
-      profit = -stake;
-      balance += profit;
+    if (stake > 0) {
+      if (m.status === 'wygrany') {
+        profit = stake * (odd - 1);
+        balance += profit;
+      } else if (m.status === 'przegrany') {
+        profit = -stake;
+        balance += profit;
+      }
     }
     
     balance = Math.round(balance * 100) / 100;

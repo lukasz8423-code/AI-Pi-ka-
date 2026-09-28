@@ -105,24 +105,55 @@ export function BankrollPanel({
 
             {/* Prawa strona: Sugerowana kwota w PLN i zysk */}
             <div className="space-y-2 bg-slate-900/50 p-2.5 rounded border border-slate-800/80">
-              <div className="text-xs text-slate-400">
-                Sugerowana stawka: <strong className="text-emerald-400 font-mono text-sm">{getSuggestedStake(rec.odd, rec.ev).stake} PLN</strong>
-                <span className="text-[10px] text-slate-500 block font-mono mt-0.5">(Twój kapitał: {getSuggestedStake(rec.odd, rec.ev).balance} PLN)</span>
-              </div>
-              <div className="text-xs text-slate-400 border-t border-slate-800/50 pt-1.5">
-                Potencjalny zysk netto: <strong className="text-teal-400 font-mono text-sm">{(getSuggestedStake(rec.odd, rec.ev).stake * (rec.odd - 1)).toFixed(2)} PLN</strong>
-                <span className="text-[10px] text-slate-500 block mt-0.5">(Łączna wygrana: {(getSuggestedStake(rec.odd, rec.ev).stake * rec.odd).toFixed(2)} PLN)</span>
-              </div>
+              {(() => {
+                const suggested = getSuggestedStake(rec.odd, rec.ev);
+                const isZeroKelly = bankrollSettings.strategy === 'kelly' && suggested.stake <= 0;
+                return (
+                  <>
+                    <div className="text-xs text-slate-400">
+                      Sugerowana stawka:{' '}
+                      {isZeroKelly ? (
+                        <strong className="text-amber-400 font-sans text-xs">Brak przewagi – nie stawiaj</strong>
+                      ) : (
+                        <strong className="text-emerald-400 font-mono text-sm">{suggested.stake} PLN</strong>
+                      )}
+                      <span className="text-[10px] text-slate-500 block font-mono mt-0.5">(Twój kapitał: {suggested.balance} PLN)</span>
+                    </div>
+                    <div className="text-xs text-slate-400 border-t border-slate-800/50 pt-1.5">
+                      Potencjalny zysk netto:{' '}
+                      <strong className="text-teal-400 font-mono text-sm">
+                        {(isZeroKelly ? 0 : suggested.stake * (rec.odd - 1)).toFixed(2)} PLN
+                      </strong>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">
+                        (Łączna wygrana: {(isZeroKelly ? 0 : suggested.stake * rec.odd).toFixed(2)} PLN)
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
-          <button
-            onClick={handlePlaceBet}
-            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded transition shadow-md shadow-emerald-950/20 flex items-center gap-1.5 justify-center cursor-pointer"
-          >
-            <TrendingUp className="w-3.5 h-3.5 text-white" />
-            Zatwierdź i Postaw sugerowany zakład ({getSuggestedStake(rec.odd, rec.ev).stake} PLN)
-          </button>
+          {(() => {
+            const suggested = getSuggestedStake(rec.odd, rec.ev);
+            const isZeroKelly = bankrollSettings.strategy === 'kelly' && suggested.stake <= 0;
+            return (
+              <button
+                onClick={handlePlaceBet}
+                disabled={isZeroKelly}
+                className={`w-full py-2 font-bold text-xs rounded transition shadow-md flex items-center gap-1.5 justify-center ${
+                  isZeroKelly
+                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/20 cursor-pointer'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                {isZeroKelly
+                  ? 'Brak przewagi – nie stawiaj'
+                  : `Zatwierdź i Postaw sugerowany zakład (${suggested.stake} PLN)`}
+              </button>
+            );
+          })()}
         </div>
       )}
     </div>

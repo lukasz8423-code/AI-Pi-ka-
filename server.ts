@@ -1,6 +1,8 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import rateLimit from "express-rate-limit";
 
 // Funkcja pomocnicza do dynamicznego wyliczania kursów w zależności od aktualnego wyniku live
 function calculateOdds(gole1: number, gole2: number) {
@@ -24,17 +26,53 @@ function calculateOdds(gole1: number, gole2: number) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
-  // Obsługa JSON w żądaniach
-  app.use(express.json());
+  app.set("trust proxy", 1);
+
+  // Opcjonalna obsługa CORS ograniczona do ALLOWED_ORIGIN (jeśli skonfigurowano)
+  const allowedOrigin = process.env.ALLOWED_ORIGIN;
+  if (allowedOrigin) {
+    app.use((req, res, next) => {
+      res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization");
+      if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+      }
+      next();
+    });
+  }
+
+  // Obsługa JSON w żądaniach z limitem 50kb
+  app.use(express.json({ limit: "50kb" }));
+
+  // Rate limiting dla endpointów API
+  const analyzeLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Zbyt wiele zapytań do analizy AI. Spróbuj ponownie za minutę." }
+  });
+
+  const realMatchesLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Zbyt wiele zapytań o mecze live. Spróbuj ponownie za minutę." }
+  });
 
   // API do analizy meczu przy użyciu Gemini AI
-  app.post("/api/analyze", async (req, res) => {
+  app.post("/api/analyze", analyzeLimiter, async (req, res) => {
     try {
       const { prompt } = req.body;
-      if (!prompt) {
-        return res.status(400).json({ error: "Brak promptu do analizy." });
+      if (typeof prompt !== "string" || prompt.trim().length === 0) {
+        return res.status(400).json({ error: "Brak promptu do analizy lub podana wartość jest pusta." });
+      }
+      if (prompt.length > 8000) {
+        return res.status(400).json({ error: "Prompt jest zbyt długi (maksymalna dozwolona długość to 8000 znaków)." });
       }
 
       // Bezpieczna, leniwa inicjalizacja klucza API (lazy initialization)
@@ -76,7 +114,7 @@ async function startServer() {
   });
 
   // API do pobierania realnych meczów z dzisiejszego dnia (Football-Data.org lub API-Football / api-sports.io)
-  app.get("/api/real-matches", async (req, res) => {
+  app.get("/api/real-matches", realMatchesLimiter, async (req, res) => {
     try {
       const userHeaderKey = req.headers["x-api-key"] || req.headers["x-auth-token"];
       let key = "";
@@ -231,6 +269,7 @@ async function startServer() {
               strzaly1: m.status === "FINISHED" ? Math.round(gole1 * 3.5 + Math.random() * 5) : Math.round(minuta * 0.12),
               strzaly2: m.status === "FINISHED" ? Math.round(gole2 * 3.5 + Math.random() * 5) : Math.round(minuta * 0.1),
               status,
+              daneSzacunkowe: true,
               dataDodania: m.utcDate || new Date().toISOString(),
               notatki: `Rozgrywki: ${m.competition?.name || "Liga"}, Status: ${m.status} (Football-Data.org)`
             };
@@ -320,6 +359,7 @@ async function startServer() {
                 strzaly1: statusShort === "FT" ? Math.round(gole1 * 3.5 + Math.random() * 5) : Math.round(minuta * 0.12),
                 strzaly2: statusShort === "FT" ? Math.round(gole2 * 3.5 + Math.random() * 5) : Math.round(minuta * 0.13),
                 status,
+                daneSzacunkowe: true,
                 dataDodania: m.fixture?.date || new Date().toISOString(),
                 notatki: `Rozgrywki: ${m.league?.name || "Liga"} (${m.league?.country || "Kraj"}), Status: ${statusLong} (API-Football)`
               };

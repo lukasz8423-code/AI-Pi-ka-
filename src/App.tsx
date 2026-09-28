@@ -34,28 +34,35 @@ export default function App() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as LiveMatch[];
-        const now = Date.now();
-        // Usuwamy mecze starsze niż 72h, a te starsze niż 12h na żywo przenosimy do rozliczonych (jako anulowany)
-        const cleaned = parsed
-          .filter(m => {
-            if (!m.dataDodania) return true;
-            const addedTime = new Date(m.dataDodania).getTime();
-            return (now - addedTime) < 72 * 60 * 60 * 1000; // 3 dni max
-          })
-          .map(m => {
-            if (m.status === 'niesprawdzony' && m.dataDodania) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const now = Date.now();
+          // Usuwamy mecze starsze niż 72h, a te starsze niż 12h na żywo przenosimy do rozliczonych (jako anulowany)
+          const cleaned = parsed
+            .filter((m: any) => {
+              if (!m || typeof m !== 'object') return false;
+              if (!m.dataDodania) return true;
               const addedTime = new Date(m.dataDodania).getTime();
-              if (now - addedTime > 12 * 60 * 60 * 1000) { // 12 godzin max na żywo
-                return { ...m, status: 'anulowany' as const };
+              return (now - addedTime) < 72 * 60 * 60 * 1000; // 3 dni max
+            })
+            .map((m: LiveMatch) => {
+              let copy = { ...m };
+              if (copy.status === 'niesprawdzony' && copy.dataDodania) {
+                const addedTime = new Date(copy.dataDodania).getTime();
+                if (now - addedTime > 12 * 60 * 60 * 1000) { // 12 godzin max na żywo
+                  copy = { ...copy, status: 'anulowany' as const };
+                }
               }
-            }
-            if (!m.startingPreMatchProbs) {
-              m.startingPreMatchProbs = uzyskaj_pre_match_proby(m);
-            }
-            return m;
-          });
-        return cleaned;
+              if (!copy.startingPreMatchProbs) {
+                copy = {
+                  ...copy,
+                  startingPreMatchProbs: uzyskaj_pre_match_proby(copy)
+                };
+              }
+              return copy;
+            });
+          return cleaned;
+        }
       } catch (e) {
         console.error("Błąd parsowania meczów z localStorage:", e);
       }
@@ -73,19 +80,35 @@ export default function App() {
   });
 
   const [bankrollSettings, setBankrollSettings] = useState<BankrollSettings>(() => {
-    const saved = localStorage.getItem('asystent_live_bet_bankroll');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Błąd parsowania bankrollu z localStorage:", e);
-      }
-    }
-    return {
+    const defaultBankroll: BankrollSettings = {
       initial: 1000,
       strategy: 'percent',
       parameter: 2, // Domyślnie 2% kapitału
     };
+    const saved = localStorage.getItem('asystent_live_bet_bankroll');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          typeof parsed.initial === 'number' &&
+          !isNaN(parsed.initial) &&
+          ['flat', 'percent', 'kelly'].includes(parsed.strategy) &&
+          typeof parsed.parameter === 'number' &&
+          !isNaN(parsed.parameter)
+        ) {
+          return {
+            initial: parsed.initial,
+            strategy: parsed.strategy,
+            parameter: parsed.parameter
+          };
+        }
+      } catch (e) {
+        console.error("Błąd parsowania bankrollu z localStorage:", e);
+      }
+    }
+    return defaultBankroll;
   });
 
   // Zapisywanie bankrollSettings do LocalStorage
@@ -98,7 +121,10 @@ export default function App() {
     const saved = localStorage.getItem('asystent_live_bet_pinned');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((id): id is string => typeof id === 'string');
+        }
       } catch (e) {
         console.error("Błąd parsowania przypiętych meczów:", e);
       }
@@ -314,7 +340,8 @@ export default function App() {
     setAnalyzingMatchId(targetMatchId);
     setAiError(null);
     try {
-      const response = await fetch('/api/analyze', {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+      const response = await fetch(`${baseUrl}/api/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -351,7 +378,8 @@ export default function App() {
     setFetchingReal(true);
     setFetchError(null);
     try {
-      const response = await fetch('/api/real-matches', {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
+      const response = await fetch(`${baseUrl}/api/real-matches`, {
         headers: {
           'X-API-Key': footballApiKey
         }
@@ -386,8 +414,11 @@ export default function App() {
 
       // Jeśli to były mecze demonstracyjne, dajemy użytkownikowi informację w stanie
       if (data.isDemo) {
+        const isKeyProvided = Boolean(footballApiKey && footballApiKey.trim().length > 0);
         setFetchError({
-          message: "Pobrano mecze demonstracyjne (brak klucza FOOTBALL_API_KEY).",
+          message: isKeyProvided && data.error
+            ? `Błąd zewnętrznych API: ${data.error}`
+            : "Pobrano mecze demonstracyjne (brak klucza FOOTBALL_API_KEY).",
           code: "DEMO_MODE"
         });
       }
@@ -504,6 +535,7 @@ export default function App() {
                 {/* 1. Panel Analizy Probabilistycznej i Kursów */}
                 <AnalysisPanel
                   match={selectedMatch}
+                  matches={matches}
                   onUpdateMatch={handleUpdateMatch}
                   onTriggerAiAnalysis={handleTriggerAiAnalysis}
                   aiLoading={analyzingMatchId === selectedMatch.id}

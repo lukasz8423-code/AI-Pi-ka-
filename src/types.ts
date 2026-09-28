@@ -31,6 +31,7 @@ export interface LiveMatch {
   aiAnaliza?: string;
   isLocked?: boolean;
   isLiveOdds?: boolean;
+  daneSzacunkowe?: boolean;
   startingPreMatchProbs?: {
     p1: number;
     px: number;

@@ -40,8 +40,8 @@ export function EVBetsPanel({ evBets }: EVBetsPanelProps) {
                     VALUE BET
                   </span>
                   {b.kellyStake !== undefined && b.kellyStake > 0 && (
-                    <div className="text-[9px] font-mono font-extrabold text-emerald-300 mt-0.5 leading-none">
-                      Stawka: {b.kellyStake}%
+                    <div className="text-[9px] font-mono font-extrabold text-emerald-300 mt-0.5 leading-tight">
+                      Stawka: {b.kellyStake}% <span className="text-[7.5px] font-normal text-emerald-400/90 block font-sans">(ćwierć-Kelly, % bankrollu)</span>
                     </div>
                   )}
                 </div>
