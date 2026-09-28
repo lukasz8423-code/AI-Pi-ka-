@@ -1,6 +1,6 @@
 import React from 'react';
 import { LiveMatch } from '../types';
-import { SlidersHorizontal, Radio, Download, Star, Lock, Sparkles, Plus, ChevronRight } from 'lucide-react';
+import { SlidersHorizontal, Radio, Download, Star, Lock, Sparkles, Plus, ChevronRight, Trash2 } from 'lucide-react';
 import { checkHasValuebet } from './MatchList';
 
 interface CompactMatchListViewProps {
@@ -9,6 +9,7 @@ interface CompactMatchListViewProps {
   selectedMatchId: string | null;
   pinnedMatchIds: string[];
   onSelectMatch: (id: string) => void;
+  onDeleteMatch: (id: string) => void;
   onFetchRealMatches: () => void;
   fetchingReal: boolean;
   onOpenAddMatchModal: () => void;
@@ -20,6 +21,7 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
   selectedMatchId,
   pinnedMatchIds,
   onSelectMatch,
+  onDeleteMatch,
   onFetchRealMatches,
   fetchingReal,
   onOpenAddMatchModal,
@@ -64,8 +66,8 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
           </div>
 
           {/* Podgląd wybranych meczów */}
-          <div className="space-y-2">
-            {liveMatches.slice(0, 2).map((m) => {
+          <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
+            {liveMatches.slice(0, 4).map((m) => {
               const isSelected = m.id === selectedMatchId;
               const hasVal = checkHasValuebet(m);
               return (
@@ -89,7 +91,17 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
                         </span>
                       )}
                       {m.isLocked && <Lock className="w-2.5 h-2.5 text-amber-400" />}
-                      <ChevronRight className={`w-3 h-3 text-slate-500 group-hover:text-sky-400 transition ${isSelected ? 'text-sky-400' : ''}`} />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteMatch(m.id);
+                        }}
+                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/50 rounded-md transition cursor-pointer ml-1"
+                        title="Usuń mecz z listy"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
 
@@ -169,7 +181,17 @@ export const CompactMatchListView: React.FC<CompactMatchListViewProps> = ({
                         </span>
                       )}
                       <span className="text-slate-400 text-[9px]">@{m.kursZalecany || m.kurs1}</span>
-                      <ChevronRight className={`w-3 h-3 text-slate-600 group-hover:text-sky-400 transition ${isSelected ? 'text-sky-400' : ''}`} />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteMatch(m.id);
+                        }}
+                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/50 rounded-md transition cursor-pointer ml-1"
+                        title="Usuń mecz z listy"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
 

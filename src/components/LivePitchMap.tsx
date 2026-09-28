@@ -1,11 +1,13 @@
 import React from 'react';
 import { LiveMatch } from '../types';
+import { Trash2 } from 'lucide-react';
 
 interface LivePitchMapProps {
   match: LiveMatch;
+  onDeleteMatch?: (id: string) => void;
 }
 
-export const LivePitchMap: React.FC<LivePitchMapProps> = ({ match }) => {
+export const LivePitchMap: React.FC<LivePitchMapProps> = ({ match, onDeleteMatch }) => {
   const possessionAway = match.posiadaniePilki2 ?? (match.posiadaniePilki1 ? 100 - match.posiadaniePilki1 : 53);
   const isAwayLeading = match.gole2 > match.gole1;
   const isHomeLeading = match.gole1 > match.gole2;
@@ -39,6 +41,16 @@ export const LivePitchMap: React.FC<LivePitchMapProps> = ({ match }) => {
           <span className="text-xs font-bold text-slate-200 truncate max-w-[120px] sm:max-w-[150px]">
             {match.gosc}
           </span>
+          {onDeleteMatch && (
+            <button
+              type="button"
+              onClick={() => onDeleteMatch(match.id)}
+              className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer ml-1"
+              title="Usuń ten mecz z listy"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

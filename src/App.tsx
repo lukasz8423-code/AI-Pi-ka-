@@ -19,7 +19,7 @@ import { AddMatchModal } from './components/AddMatchModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { fetchRealMatchesSafe, fetchAiAnalysisSafe } from './utils/apiService';
-import { Key, X, Plus, ShieldCheck, Sparkles, SlidersHorizontal, BarChart3, Radio } from 'lucide-react';
+import { Key, X, Plus, ShieldCheck, Sparkles, SlidersHorizontal, BarChart3, Radio, Trash2, RotateCcw } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -167,6 +167,22 @@ export default function App() {
     setMatches(prev => prev.map(m => m.id === updated.id ? updated : m));
   };
 
+  const handleDeleteMatch = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setMatches(prev => {
+      const updated = prev.filter(m => m.id !== id);
+      if (selectedMatchId === id) {
+        setSelectedMatchId(updated.length > 0 ? updated[0].id : null);
+      }
+      return updated;
+    });
+  };
+
+  const handleRestoreDefaultMatches = () => {
+    setMatches(INITIAL_MATCHES);
+    setSelectedMatchId(INITIAL_MATCHES[0]?.id || null);
+  };
+
   const handleFetchRealMatches = async () => {
     if (fetchingReal) return;
     setFetchingReal(true);
@@ -270,14 +286,30 @@ export default function App() {
                   {selectedMatch ? (
                     <div className="space-y-4 animate-fadeIn">
                       {/* Live Match Map - 2D Boisko piłkarskie ze strefami taktycznymi */}
-                      <LivePitchMap match={selectedMatch} />
+                      <LivePitchMap match={selectedMatch} onDeleteMatch={handleDeleteMatch} />
 
                       {/* Miniatura statystyk (Possession, Pressure Index, Shots, Line of Stagnation, Wave Timeline) */}
                       <MatchPitchStats match={selectedMatch} />
                     </div>
                   ) : (
-                    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-12 text-center text-slate-400">
-                      Wybierz mecz z listy, aby wyświetlić analizę na żywo.
+                    <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-12 text-center text-slate-400 space-y-3">
+                      <p className="text-sm">Brak meczów na liście do analizy.</p>
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={handleRestoreDefaultMatches}
+                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Przywróć domyślne mecze</span>
+                        </button>
+                        <button
+                          onClick={() => setShowAddMatchModal(true)}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Dodaj mecz ręcznie</span>
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -300,6 +332,7 @@ export default function App() {
                     selectedMatchId={selectedMatchId}
                     pinnedMatchIds={pinnedMatchIds}
                     onSelectMatch={handleSelectMatch}
+                    onDeleteMatch={handleDeleteMatch}
                     onFetchRealMatches={handleFetchRealMatches}
                     fetchingReal={fetchingReal}
                     onOpenAddMatchModal={() => setShowAddMatchModal(true)}
@@ -323,18 +356,30 @@ export default function App() {
           )}
 
           {/* Zakładka: Analytics & Zaawansowane Modele */}
-          {currentTab === 'analytics' && selectedMatch && (
+          {currentTab === 'analytics' && (
             <div className="animate-fadeIn">
-              <AnalysisPanel
-                match={selectedMatch}
-                matches={matches}
-                onUpdateMatch={handleUpdateMatch}
-                onTriggerAiAnalysis={handleTriggerAiAnalysis}
-                aiLoading={analyzingMatchId === selectedMatch.id}
-                bankrollSettings={bankrollSettings}
-                onOpenAddMatchForm={() => setShowAddMatchModal(true)}
-                lastFetched={lastFetched}
-              />
+              {selectedMatch ? (
+                <AnalysisPanel
+                  match={selectedMatch}
+                  matches={matches}
+                  onUpdateMatch={handleUpdateMatch}
+                  onTriggerAiAnalysis={handleTriggerAiAnalysis}
+                  aiLoading={analyzingMatchId === selectedMatch.id}
+                  bankrollSettings={bankrollSettings}
+                  onOpenAddMatchForm={() => setShowAddMatchModal(true)}
+                  lastFetched={lastFetched}
+                />
+              ) : (
+                <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-12 text-center text-slate-400 space-y-3">
+                  <p>Wybierz lub dodaj mecz, aby wyświetlić zaawansowane modele matematyczne.</p>
+                  <button
+                    onClick={handleRestoreDefaultMatches}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Przywróć domyślne mecze
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -352,39 +397,72 @@ export default function App() {
           {/* Zakładka: Filtry / Wszystkie mecze */}
           {currentTab === 'filtry' && (
             <div className="bg-[#0b131e] border border-slate-850 rounded-2xl p-6 space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
                   <SlidersHorizontal className="w-5 h-5 text-sky-400" />
-                  Zarządzanie Meczami i Filtrami
+                  <span>Zarządzanie Meczami i Filtrami ({matches.length})</span>
                 </h2>
-                <button
-                  onClick={handleFetchRealMatches}
-                  disabled={fetchingReal}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
-                >
-                  {fetchingReal ? 'Pobieranie...' : 'Pobierz mecze z API'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowAddMatchModal(true)}
+                    className="bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Dodaj mecz</span>
+                  </button>
+                  <button
+                    onClick={handleRestoreDefaultMatches}
+                    className="bg-slate-900 hover:bg-slate-800 border border-slate-750 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl transition cursor-pointer flex items-center gap-1"
+                    title="Przywróć przykładowe mecze"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Przywróć</span>
+                  </button>
+                  <button
+                    onClick={handleFetchRealMatches}
+                    disabled={fetchingReal}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition cursor-pointer"
+                  >
+                    {fetchingReal ? 'Pobieranie...' : 'Pobierz mecze z API'}
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {matches.map(m => (
-                  <div
-                    key={m.id}
-                    onClick={() => {
-                      setSelectedMatchId(m.id);
-                      setCurrentTab('dashboard');
-                    }}
-                    className="bg-[#0e1724] border border-slate-800 hover:border-sky-500 p-4 rounded-xl cursor-pointer transition shadow-md"
-                  >
-                    <div className="flex justify-between text-xs text-slate-400 mb-2 font-mono">
-                      <span className="text-emerald-400 font-bold">Minuta {m.minuta}'</span>
-                      <span>@{m.kursZalecany || m.kurs1}</span>
+              {matches.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <p className="text-sm">Brak meczów na liście.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {matches.map(m => (
+                    <div
+                      key={m.id}
+                      onClick={() => {
+                        setSelectedMatchId(m.id);
+                        setCurrentTab('dashboard');
+                      }}
+                      className="bg-[#0e1724] border border-slate-800 hover:border-sky-500 p-4 rounded-xl cursor-pointer transition shadow-md relative group"
+                    >
+                      <div className="flex justify-between items-center text-xs text-slate-400 mb-2 font-mono">
+                        <span className="text-emerald-400 font-bold">Minuta {m.minuta}'</span>
+                        <div className="flex items-center gap-2">
+                          <span>@{m.kursZalecany || m.kurs1}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteMatch(m.id, e)}
+                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/60 rounded-md transition cursor-pointer"
+                            title="Usuń mecz z listy"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-sm font-bold text-slate-100">{m.gospodarz} {m.gole1} : {m.gole2} {m.gosc}</div>
+                      <div className="text-xs text-slate-400 mt-2 line-clamp-2">{m.notatki || 'Brak notatek'}</div>
                     </div>
-                    <div className="text-sm font-bold text-slate-100">{m.gospodarz} {m.gole1} : {m.gole2} {m.gosc}</div>
-                    <div className="text-xs text-slate-400 mt-2 line-clamp-2">{m.notatki || 'Brak notatek'}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
