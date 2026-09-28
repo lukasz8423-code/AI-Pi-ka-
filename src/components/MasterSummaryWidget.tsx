@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LiveMatch, BankrollSettings } from '../types';
 import { obliczStawke, pobierz_i_opisz_staty, przelicz_prawdopodobienstwa, wygladz_prawdopodobienstwa, uzyskaj_pre_match_proby } from '../utils/bettingCalc';
 import { 
@@ -40,6 +40,24 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
     betPlaced,
   } = match;
 
+  // Stany lokalne (string) pozwalające na swobodne pisanie z klawiatury (backspace, przecinek, kropka)
+  const [localMinuta, setLocalMinuta] = useState<string>(String(minuta));
+  const [localGole1, setLocalGole1] = useState<string>(String(gole1));
+  const [localGole2, setLocalGole2] = useState<string>(String(gole2));
+  const [localKurs1, setLocalKurs1] = useState<string>(String(kurs1));
+  const [localKursX, setLocalKursX] = useState<string>(String(kurs_x));
+  const [localKurs2, setLocalKurs2] = useState<string>(String(kurs2));
+
+  // Synchronizacja przy zmianie meczu lub aktualizacji zewnętrznej
+  useEffect(() => {
+    setLocalMinuta(String(minuta));
+    setLocalGole1(String(gole1));
+    setLocalGole2(String(gole2));
+    setLocalKurs1(String(kurs1));
+    setLocalKursX(String(kurs_x));
+    setLocalKurs2(String(kurs2));
+  }, [match.id, minuta, gole1, gole2, kurs1, kurs_x, kurs2]);
+
   // 1. OBLICZANIE REALNEGO SALDA KAPITAŁOWEGO (Domyślnie 50 PLN budżet startowy)
   let currentBalance = bankrollSettings.initial || 50.00;
   try {
@@ -67,7 +85,7 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
   const bestEv = evZalecane ?? 0.045;
   const evPercent = (bestEv * 100).toFixed(1);
 
-  // Stawka wyliczona matematycznie (np. 2.50 zł lub 5.00 zł dla budżetu 50 PLN)
+  // Stawka wyliczona matematycznie
   const calcStake = obliczStawke(
     bankrollSettings.strategy,
     bankrollSettings.parameter,
@@ -76,12 +94,12 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
     bestEv,
     match.confidenceDiscount
   );
-  // Ścisłe ograniczenie stawki do budżetu!
+  // Ścisłe ograniczenie stawki do budżetu
   const activeStake = betPlaced?.stake 
     ? betPlaced.stake 
     : Math.min(currentBalance, Math.max(1, calcStake > 0 ? calcStake : Math.round(currentBalance * 0.05 * 100) / 100));
 
-  // 3. SPÓJNA I LOGICZNA PRECYZYJNA OBLICZENIOWA WARTOŚĆ CASHOUTU (PLN)
+  // 3. LOGICZNA KALKULACJA CASHOUTU W PLN (ŚCIŚLE POWIĄZANA Z 50 PLN BUDŻETEM)
   const entryOdd = betPlaced?.odd || bestOdd;
   const potentialWinPLN = Math.round(activeStake * entryOdd * 100) / 100;
 
@@ -96,18 +114,15 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
 
   let cashoutValuePLN = 0;
   if (isCurrentlyWinning) {
-    // Wygrywający kupon: Cashout rośnie od stawki w stronę pełnej wygranej w zależności od minuty meczu
     const timeProgress = Math.min(1, Math.max(0, (minuta - 1) / 89));
     const oddsRatio = Math.min(1.0, entryOdd / Math.max(1.01, currentLiveOdd));
     const winBonus = (potentialWinPLN - activeStake) * (0.45 + 0.50 * timeProgress) * oddsRatio;
     const rawCashout = activeStake + winBonus;
     cashoutValuePLN = Math.min(potentialWinPLN * 0.98, Math.max(activeStake * 0.9, Math.round(rawCashout * 100) / 100));
   } else if (gole1 === gole2) {
-    // Remis: Częściowy spadek wartości kuponu wraz z upływem minut
     const decay = Math.max(0.15, 0.85 - (minuta / 90) * 0.70);
     cashoutValuePLN = Math.round(activeStake * decay * 100) / 100;
   } else {
-    // Przegrywający: Stop loss z odzyskiem od 5% do 30% stawki
     const stopLoss = Math.max(0.05, 0.30 - (minuta / 90) * 0.25);
     cashoutValuePLN = Math.round(activeStake * stopLoss * 100) / 100;
   }
@@ -143,41 +158,43 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
     riskBadgeColor = 'bg-rose-950/60 text-rose-300 border-rose-800/80';
   }
 
-  // EDYCJA MINUTY I DANYCH (SWOBODNE WPISYWANIE Z KLAWIATURY)
-  const handleMinuteInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const valStr = e.target.value;
-    if (valStr === '') {
-      onUpdateMatch({ ...match, minuta: 1 });
-    } else {
-      const val = parseInt(valStr, 10);
-      if (!isNaN(val)) {
-        onUpdateMatch({ ...match, minuta: Math.min(120, Math.max(1, val)) });
-      }
+  // --- OBSŁUGA OBSZARÓW SWOBODNEGO WPISYWANIA Z KLAWIATURY ---
+  const handleMinuteType = (valStr: string) => {
+    setLocalMinuta(valStr);
+    const val = parseInt(valStr, 10);
+    if (!isNaN(val) && val >= 1 && val <= 120) {
+      onUpdateMatch({ ...match, minuta: val });
     }
   };
 
-  const handleQuickMinute = (delta: number) => {
+  const handleQuickMinuteDelta = (delta: number) => {
     const newMin = Math.min(120, Math.max(1, minuta + delta));
+    setLocalMinuta(String(newMin));
     onUpdateMatch({ ...match, minuta: newMin });
   };
 
-  const handleQuickScore = (team: 'gole1' | 'gole2', delta: number) => {
-    const current = team === 'gole1' ? gole1 : gole2;
-    const val = Math.max(0, current + delta);
-    onUpdateMatch({ ...match, [team]: val });
-  };
+  const handleScoreType = (team: 'gole1' | 'gole2', valStr: string) => {
+    if (team === 'gole1') setLocalGole1(valStr);
+    else setLocalGole2(valStr);
 
-  const handleScoreInputChange = (team: 'gole1' | 'gole2', valStr: string) => {
     const val = parseInt(valStr, 10);
     if (!isNaN(val) && val >= 0) {
       onUpdateMatch({ ...match, [team]: val });
-    } else if (valStr === '') {
-      onUpdateMatch({ ...match, [team]: 0 });
     }
   };
 
-  const handleQuickOdds = (field: 'kurs1' | 'kurs_x' | 'kurs2', valStr: string) => {
-    const val = parseFloat(valStr.replace(',', '.'));
+  const handleQuickScoreDelta = (team: 'gole1' | 'gole2', delta: number) => {
+    const current = team === 'gole1' ? gole1 : gole2;
+    const val = Math.max(0, current + delta);
+    if (team === 'gole1') setLocalGole1(String(val));
+    else setLocalGole2(String(val));
+    onUpdateMatch({ ...match, [team]: val });
+  };
+
+  const handleOddsType = (field: 'kurs1' | 'kurs_x' | 'kurs2', valStr: string, setter: (v: string) => void) => {
+    setter(valStr);
+    const normalized = valStr.replace(',', '.');
+    const val = parseFloat(normalized);
     if (!isNaN(val) && val >= 1.01) {
       onUpdateMatch({ ...match, [field]: val });
     }
@@ -204,32 +221,32 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
 
       {/* 1. SEKCJA GŁÓWNEJ REKOMENDACJI GEMINI (MASTER SUMMARY HEADER) */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-extrabold px-2.5 py-0.5 rounded-md shadow-sm">
+            <span className="flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-extrabold px-2.5 py-0.5 rounded-md shadow-sm shrink-0">
               <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400/30 shrink-0" />
               <span>GŁÓWNA REKOMENDACJA AI</span>
             </span>
 
             {isGoldenWindowActive ? (
-              <span className="bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse">
+              <span className="bg-emerald-950/80 border border-emerald-500 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-md animate-pulse shrink-0">
                 ⚡ ZŁOTE OKNO AKTYWNE (65'-75')
               </span>
             ) : isGoldenWindowUpcoming ? (
-              <span className="bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-mono px-2 py-0.5 rounded-md">
+              <span className="bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-mono px-2 py-0.5 rounded-md shrink-0">
                 ⏳ Oczekiwanie na Złote Okno (65')
               </span>
             ) : (
-              <span className="bg-amber-950/60 border border-amber-800/80 text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-md">
+              <span className="bg-amber-950/60 border border-amber-800/80 text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-md shrink-0">
                 ⚠️ Końcówka meczu (Late Game)
               </span>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-100 flex items-center gap-2 truncate">
-              <span>{recommendedTitle}</span>
-              <span className="text-emerald-400 font-mono font-black text-sm">@{bestOdd.toFixed(2)}</span>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-100 flex items-center gap-2 min-w-0 truncate">
+              <span className="truncate">{recommendedTitle}</span>
+              <span className="text-emerald-400 font-mono font-black text-sm shrink-0">@{bestOdd.toFixed(2)}</span>
             </h2>
             <span className="text-xs text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/60 font-mono shrink-0">
               + {evPercent}% EV
@@ -284,9 +301,8 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
         </div>
       </div>
 
-      {/* 2. SIATKA KLUCZOWYCH WSKAŹNIKÓW (POZIOM RYZYKA, MOMENTUM, CASHOUT, BUDŻET) */}
+      {/* 2. SIATKA KLUCZOWYCH WSKAŹNIKÓW */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        {/* Wskaźnik 1: Poziom Ryzyka */}
         <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
           <span className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Poziom Ryzyka</span>
           <div className="flex items-center justify-between">
@@ -297,7 +313,6 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
           </div>
         </div>
 
-        {/* Wskaźnik 2: Dominacja & Momentum */}
         <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
           <span className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Presja & Momentum</span>
           <div className="flex items-center justify-between">
@@ -308,7 +323,6 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
           </div>
         </div>
 
-        {/* Wskaźnik 3: Realny Cashout (PLN z 50 PLN) */}
         <div className="bg-slate-950/80 border border-emerald-900/50 rounded-xl p-2.5">
           <span className="block text-[10px] text-emerald-400 uppercase font-bold mb-1">Wyliczony Cashout</span>
           <div className="flex items-center justify-between">
@@ -321,7 +335,6 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
           </div>
         </div>
 
-        {/* Wskaźnik 4: Budżet Startowy */}
         <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5">
           <span className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Kapitał Użytkownika</span>
           <div className="flex items-center justify-between">
@@ -333,26 +346,26 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
         </div>
       </div>
 
-      {/* 3. WBUDOWANA SZYBKA EDYCJA MECZU - BEZPOŚREDNIE POLE EDIT MINUTY I SCORE */}
+      {/* 3. WBUDOWANA SZYBKA EDYCJA MECZU - SWOBODNE WPISYWANIE MINUTY, WYNIKU I KURSÓW Z KLAWIATURY (BEZ SUWAKÓW) */}
       <div className="bg-[#0b1420] border border-slate-800 rounded-xl p-3 space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Szybka edycja na żywo (Swobodne wpisywanie z klawiatury):</span>
+            <span>Szybka edycja na żywo (Ręczne wpisywanie z klawiatury):</span>
           </span>
           <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
-            Wpisz minutę / gole bezpośrednio
+            Bez suwaków - wpisz minutę / gole / kursy bezpośrednio
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 items-center">
           {/* Szybki Wynik Gospodarz */}
-          <div className="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-lg gap-2">
-            <span className="text-xs font-semibold text-slate-200 truncate flex-1 min-w-0">{gospodarz}</span>
+          <div className="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-lg gap-2 min-w-0">
+            <span className="text-xs font-semibold text-slate-200 truncate flex-1 min-w-0" title={gospodarz}>{gospodarz}</span>
             <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={() => handleQuickScore('gole1', -1)}
+                onClick={() => handleQuickScoreDelta('gole1', -1)}
                 className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95"
               >
                 -
@@ -361,13 +374,13 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
                 type="number"
                 min="0"
                 max="20"
-                value={gole1}
-                onChange={(e) => handleScoreInputChange('gole1', e.target.value)}
-                className="w-8 bg-slate-900 border border-slate-700 rounded py-0.5 text-center text-xs font-bold font-mono text-emerald-400 outline-none focus:border-sky-500"
+                value={localGole1}
+                onChange={(e) => handleScoreType('gole1', e.target.value)}
+                className="w-10 bg-slate-900 border border-slate-700 rounded py-0.5 text-center text-xs font-bold font-mono text-emerald-400 outline-none focus:border-sky-500"
               />
               <button
                 type="button"
-                onClick={() => handleQuickScore('gole1', 1)}
+                onClick={() => handleQuickScoreDelta('gole1', 1)}
                 className="w-5 h-5 rounded bg-sky-900 hover:bg-sky-800 text-sky-200 font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95"
               >
                 +
@@ -375,7 +388,7 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
             </div>
           </div>
 
-          {/* Swobodna Minuta (Bezpośredni Input Numeryczny) */}
+          {/* Swobodna Minuta (Jednolity Input Liczbowy) */}
           <div className="flex items-center justify-between bg-slate-950 border border-emerald-900/60 px-2.5 py-1.5 rounded-lg gap-2">
             <div className="flex items-center gap-1 shrink-0">
               <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -385,8 +398,8 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => handleQuickMinute(-1)}
-                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] flex items-center justify-center cursor-pointer"
+                onClick={() => handleQuickMinuteDelta(-1)}
+                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] flex items-center justify-center cursor-pointer shrink-0"
                 title="-1 min"
               >
                 -1
@@ -395,15 +408,15 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
                 type="number"
                 min="1"
                 max="120"
-                value={minuta}
-                onChange={handleMinuteInputChange}
-                className="w-12 bg-slate-900 border border-emerald-500/50 rounded py-0.5 text-center text-xs font-bold font-mono text-emerald-400 outline-none focus:border-emerald-400"
+                value={localMinuta}
+                onChange={(e) => handleMinuteType(e.target.value)}
+                className="w-14 bg-slate-900 border border-emerald-500/50 rounded py-0.5 text-center text-xs font-bold font-mono text-emerald-400 outline-none focus:border-emerald-400"
                 placeholder="75"
               />
               <button
                 type="button"
-                onClick={() => handleQuickMinute(1)}
-                className="w-5 h-5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-mono text-[10px] flex items-center justify-center cursor-pointer"
+                onClick={() => handleQuickMinuteDelta(1)}
+                className="w-5 h-5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 font-mono text-[10px] flex items-center justify-center cursor-pointer shrink-0"
                 title="+1 min"
               >
                 +1
@@ -412,12 +425,12 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
           </div>
 
           {/* Szybki Wynik Gość */}
-          <div className="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-lg gap-2">
-            <span className="text-xs font-semibold text-slate-200 truncate flex-1 min-w-0">{gosc}</span>
+          <div className="flex items-center justify-between bg-slate-950 border border-slate-800 px-2.5 py-1.5 rounded-lg gap-2 min-w-0">
+            <span className="text-xs font-semibold text-slate-200 truncate flex-1 min-w-0" title={gosc}>{gosc}</span>
             <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
-                onClick={() => handleQuickScore('gole2', -1)}
+                onClick={() => handleQuickScoreDelta('gole2', -1)}
                 className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95"
               >
                 -
@@ -426,13 +439,13 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
                 type="number"
                 min="0"
                 max="20"
-                value={gole2}
-                onChange={(e) => handleScoreInputChange('gole2', e.target.value)}
-                className="w-8 bg-slate-900 border border-slate-700 rounded py-0.5 text-center text-xs font-bold font-mono text-emerald-400 outline-none focus:border-sky-500"
+                value={localGole2}
+                onChange={(e) => handleScoreType('gole2', e.target.value)}
+                className="w-10 bg-slate-900 border border-slate-700 rounded py-0.5 text-center text-xs font-bold font-mono text-emerald-400 outline-none focus:border-sky-500"
               />
               <button
                 type="button"
-                onClick={() => handleQuickScore('gole2', 1)}
+                onClick={() => handleQuickScoreDelta('gole2', 1)}
                 className="w-5 h-5 rounded bg-sky-900 hover:bg-sky-800 text-sky-200 font-bold text-xs flex items-center justify-center cursor-pointer active:scale-95"
               >
                 +
@@ -441,39 +454,39 @@ export const MasterSummaryWidget: React.FC<MasterSummaryWidgetProps> = ({
           </div>
         </div>
 
-        {/* Szybka edycja kursów 1X2 z rozszerzonymi strefami */}
+        {/* Szybka edycja kursów 1X2 - STANDARDOWE POLA TEKSTOWE / LICZBOWE BEZ SUWAKÓW */}
         <div className="grid grid-cols-3 gap-2 pt-1">
           <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-2 py-1 rounded-md">
-            <span className="text-[10px] text-slate-400 font-bold">1:</span>
+            <span className="text-[10px] text-slate-400 font-bold shrink-0">Kurs 1:</span>
             <input
-              type="number"
-              step="0.05"
-              min="1.01"
-              value={kurs1}
-              onChange={(e) => handleQuickOdds('kurs1', e.target.value)}
-              className="w-14 bg-transparent text-right text-xs font-mono font-bold text-slate-100 outline-none focus:text-sky-400"
+              type="text"
+              inputMode="decimal"
+              value={localKurs1}
+              onChange={(e) => handleOddsType('kurs1', e.target.value, setLocalKurs1)}
+              placeholder="2.00"
+              className="w-16 bg-transparent text-right text-xs font-mono font-bold text-slate-100 outline-none focus:text-sky-400"
             />
           </div>
           <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-2 py-1 rounded-md">
-            <span className="text-[10px] text-slate-400 font-bold">X:</span>
+            <span className="text-[10px] text-slate-400 font-bold shrink-0">Kurs X:</span>
             <input
-              type="number"
-              step="0.05"
-              min="1.01"
-              value={kurs_x}
-              onChange={(e) => handleQuickOdds('kurs_x', e.target.value)}
-              className="w-14 bg-transparent text-right text-xs font-mono font-bold text-slate-100 outline-none focus:text-sky-400"
+              type="text"
+              inputMode="decimal"
+              value={localKursX}
+              onChange={(e) => handleOddsType('kurs_x', e.target.value, setLocalKursX)}
+              placeholder="3.10"
+              className="w-16 bg-transparent text-right text-xs font-mono font-bold text-slate-100 outline-none focus:text-sky-400"
             />
           </div>
           <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 px-2 py-1 rounded-md">
-            <span className="text-[10px] text-slate-400 font-bold">2:</span>
+            <span className="text-[10px] text-slate-400 font-bold shrink-0">Kurs 2:</span>
             <input
-              type="number"
-              step="0.05"
-              min="1.01"
-              value={kurs2}
-              onChange={(e) => handleQuickOdds('kurs2', e.target.value)}
-              className="w-14 bg-transparent text-right text-xs font-mono font-bold text-slate-100 outline-none focus:text-sky-400"
+              type="text"
+              inputMode="decimal"
+              value={localKurs2}
+              onChange={(e) => handleOddsType('kurs2', e.target.value, setLocalKurs2)}
+              placeholder="3.20"
+              className="w-16 bg-transparent text-right text-xs font-mono font-bold text-slate-100 outline-none focus:text-sky-400"
             />
           </div>
         </div>

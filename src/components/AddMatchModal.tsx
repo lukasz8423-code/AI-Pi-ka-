@@ -122,9 +122,12 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
     const parsedMinuta = Math.min(90, Math.max(1, parseInt(minuta) || 1));
     const parsedGole1 = Math.max(0, parseInt(gole1) || 0);
     const parsedGole2 = Math.max(0, parseInt(gole2) || 0);
-    const parsedKurs1 = parseFloat(kurs1) > 1.01 ? parseFloat(kurs1) : 2.0;
-    const parsedKursX = parseFloat(kurs_x) > 1.01 ? parseFloat(kurs_x) : 3.0;
-    const parsedKurs2 = parseFloat(kurs2) > 1.01 ? parseFloat(kurs2) : 3.0;
+    const pK1 = parseFloat(kurs1.replace(',', '.'));
+    const pKX = parseFloat(kurs_x.replace(',', '.'));
+    const pK2 = parseFloat(kurs2.replace(',', '.'));
+    const parsedKurs1 = !isNaN(pK1) && pK1 >= 1.01 ? pK1 : 2.0;
+    const parsedKursX = !isNaN(pKX) && pKX >= 1.01 ? pKX : 3.0;
+    const parsedKurs2 = !isNaN(pK2) && pK2 >= 1.01 ? pK2 : 3.0;
     
     // Opcjonalne posiadanie piłki - brak wpisanej wartości oznacza undefined (brak domyślnych 50%)
     let parsedPossession1: number | undefined = undefined;
@@ -308,32 +311,29 @@ export const AddMatchModal: React.FC<AddMatchModalProps> = ({
             </div>
           </div>
 
-          {/* Kursy bukmacherskie 1X2 */}
+          {/* Kursy bukmacherskie 1X2 - STANDARDOWE POLA BEZ SUWAKÓW */}
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold text-slate-300">Kursy bukmacherskie (1 - X - 2):</label>
             <div className="grid grid-cols-3 gap-2">
               <input
-                type="number"
-                step="0.01"
-                min="1.01"
+                type="text"
+                inputMode="decimal"
                 value={kurs1}
                 onChange={(e) => setKurs1(e.target.value)}
                 placeholder="1 (Gosp)"
                 className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-100 font-mono text-center outline-none focus:border-sky-500"
               />
               <input
-                type="number"
-                step="0.01"
-                min="1.01"
+                type="text"
+                inputMode="decimal"
                 value={kurs_x}
                 onChange={(e) => setKursX(e.target.value)}
                 placeholder="X (Remis)"
                 className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-100 font-mono text-center outline-none focus:border-sky-500"
               />
               <input
-                type="number"
-                step="0.01"
-                min="1.01"
+                type="text"
+                inputMode="decimal"
                 value={kurs2}
                 onChange={(e) => setKurs2(e.target.value)}
                 placeholder="2 (Gość)"

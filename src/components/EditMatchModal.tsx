@@ -56,9 +56,12 @@ export const EditMatchModal: React.FC<EditMatchModalProps> = ({
     const parsedMinuta = Math.min(120, Math.max(1, parseInt(minuta, 10) || 1));
     const parsedGole1 = Math.max(0, parseInt(gole1, 10) || 0);
     const parsedGole2 = Math.max(0, parseInt(gole2, 10) || 0);
-    const parsedKurs1 = parseFloat(kurs1) > 1.01 ? parseFloat(kurs1) : 2.0;
-    const parsedKursX = parseFloat(kurs_x) > 1.01 ? parseFloat(kurs_x) : 3.0;
-    const parsedKurs2 = parseFloat(kurs2) > 1.01 ? parseFloat(kurs2) : 3.0;
+    const pK1 = parseFloat(kurs1.replace(',', '.'));
+    const pKX = parseFloat(kurs_x.replace(',', '.'));
+    const pK2 = parseFloat(kurs2.replace(',', '.'));
+    const parsedKurs1 = !isNaN(pK1) && pK1 >= 1.01 ? pK1 : 2.0;
+    const parsedKursX = !isNaN(pKX) && pKX >= 1.01 ? pKX : 3.0;
+    const parsedKurs2 = !isNaN(pK2) && pK2 >= 1.01 ? pK2 : 3.0;
 
     let parsedPossession1: number | undefined = undefined;
     let parsedPossession2: number | undefined = undefined;
@@ -277,7 +280,7 @@ export const EditMatchModal: React.FC<EditMatchModalProps> = ({
             </div>
           </div>
 
-          {/* 2. KURSY BUKMACHERSKIE 1X2 */}
+          {/* 2. KURSY BUKMACHERSKIE 1X2 - STANDARDOWE POLA BEZ SUWAKÓW */}
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-sky-400" />
@@ -287,33 +290,33 @@ export const EditMatchModal: React.FC<EditMatchModalProps> = ({
               <div>
                 <span className="block text-[10px] text-slate-400 mb-0.5 text-center truncate">1 ({match.gospodarz})</span>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
+                  type="text"
+                  inputMode="decimal"
                   value={kurs1}
                   onChange={(e) => setKurs1(e.target.value)}
+                  placeholder="2.00"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-100 font-mono text-center outline-none focus:border-sky-500"
                 />
               </div>
               <div>
                 <span className="block text-[10px] text-slate-400 mb-0.5 text-center">X (Remis)</span>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
+                  type="text"
+                  inputMode="decimal"
                   value={kurs_x}
                   onChange={(e) => setKursX(e.target.value)}
+                  placeholder="3.10"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-100 font-mono text-center outline-none focus:border-sky-500"
                 />
               </div>
               <div>
                 <span className="block text-[10px] text-slate-400 mb-0.5 text-center truncate">2 ({match.gosc})</span>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="1.01"
+                  type="text"
+                  inputMode="decimal"
                   value={kurs2}
                   onChange={(e) => setKurs2(e.target.value)}
+                  placeholder="3.20"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-100 font-mono text-center outline-none focus:border-sky-500"
                 />
               </div>
