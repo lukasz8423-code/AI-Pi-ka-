@@ -24,7 +24,8 @@ export function obliczStawke(
     const q = 1 - p;
     const b = odd - 1;
     const kellyFraction = b > 0 ? (p * b - q) / b : 0;
-    const f = Math.max(0, Math.min(1, kellyFraction));
+    // Fractional Kelly: zabezpieczenie przed nadmierną wariancją live
+    const f = Math.max(0, Math.min(0.5, kellyFraction));
     if (f <= 0) {
       return 0;
     }
@@ -32,6 +33,12 @@ export function obliczStawke(
     if (stawka <= 0) {
       return 0;
     }
+  }
+
+  // Sztywny bufor bezpieczeństwa (Safety Cap): maksymalnie 10% bieżącego bankrollu na pojedynczy zakład
+  const maxSafeSingleBet = balance * 0.10;
+  if (stawka > maxSafeSingleBet) {
+    stawka = maxSafeSingleBet;
   }
 
   if (stawka > balance) {
@@ -88,8 +95,8 @@ export function rekonstruuj_pre_match_z_live(
   px_live: number,
   p2_live: number
 ): { p1: number; px: number; p2: number } {
-  const min = Math.max(1, Math.min(90, minuta));
-  const t = (90 - min) / 90; // Pozostały czas (1.0 do 0.0)
+  const min = Math.max(1, Math.min(98, minuta));
+  const t = Math.max(0.015, (95 - min) / 95); // Pozostały czas uwzględniający doliczony czas gry
   const roznica_bramek = gole1 - gole2;
 
   let p1_pre = 0.38;
@@ -253,8 +260,8 @@ export function wygladz_prawdopodobienstwa(
   zolteKartki1?: number,
   zolteKartki2?: number
 ): { p1: number; px: number; p2: number } {
-  const min = Math.max(1, Math.min(90, minuta));
-  const t = (90 - min) / 90; // Pozostały czas (od 1.0 do 0.0)
+  const min = Math.max(1, Math.min(98, minuta));
+  const t = Math.max(0.015, (95 - min) / 95); // Pozostały czas (w tym doliczony)
   
   const suma_pre = p1_surowe + px_surowe + p2_surowe;
   const p1_pre = p1_surowe / (suma_pre || 1);

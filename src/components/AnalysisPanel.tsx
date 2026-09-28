@@ -144,83 +144,97 @@ export default function AnalysisPanel({
     };
   }, [match?.id, bankrollSettings, matches]);
 
-  // Obliczenia na żywo na podstawie aktualnego stanu wybranego meczu (zabezpieczone przed null)
-  const probsRaw = match ? przelicz_prawdopodobienstwa(match.kurs1, match.kurs_x, match.kurs2) : null;
+  // Obliczenia na żywo na podstawie aktualnego stanu wybranego meczu (zabezpieczone przed null i optymalizowane przez useMemo)
+  const probsRaw = useMemo(() => {
+    return match ? przelicz_prawdopodobienstwa(match.kurs1, match.kurs_x, match.kurs2) : null;
+  }, [match?.kurs1, match?.kurs_x, match?.kurs2]);
 
-  const preProbs = match ? uzyskaj_pre_match_proby(match) : null;
+  const preProbs = useMemo(() => {
+    return match ? uzyskaj_pre_match_proby(match) : null;
+  }, [match]);
 
-  const fairProbs = (match && preProbs && probsRaw) ? {
-    ...wygladz_prawdopodobienstwa(
+  const fairProbs = useMemo(() => {
+    if (!match || !preProbs || !probsRaw) return null;
+    return {
+      ...wygladz_prawdopodobienstwa(
+        match.gospodarz,
+        match.gosc,
+        match.gole1,
+        match.gole2,
+        match.minuta,
+        preProbs.p1,
+        preProbs.px,
+        preProbs.p2,
+        match.czerwoneKartki1,
+        match.czerwoneKartki2,
+        match.strzaly1,
+        match.strzaly2,
+        match.strzalyCelne1,
+        match.strzalyCelne2,
+        match.zolteKartki1,
+        match.zolteKartki2
+      ),
+      p1_surowe: probsRaw.p1_surowe,
+      px_surowe: probsRaw.px_surowe,
+      p2_surowe: probsRaw.p2_surowe,
+    };
+  }, [match, preProbs, probsRaw]);
+
+  // Obliczenia EV (memoizowane)
+  const evBets = useMemo(() => {
+    if (!match || !fairProbs) return [];
+    return oblicz_wartosci_zakladow(
+      match.kurs1,
+      match.kurs_x,
+      match.kurs2,
+      fairProbs.p1,
+      fairProbs.px,
+      fairProbs.p2
+    );
+  }, [match?.kurs1, match?.kurs_x, match?.kurs2, fairProbs]);
+
+  const stats = useMemo(() => {
+    if (!match || !fairProbs) return null;
+    return pobierz_i_opisz_staty(
       match.gospodarz,
       match.gosc,
       match.gole1,
       match.gole2,
       match.minuta,
-      preProbs.p1,
-      preProbs.px,
-      preProbs.p2,
-      match.czerwoneKartki1,
-      match.czerwoneKartki2,
+      fairProbs.p1,
+      fairProbs.px,
+      fairProbs.p2,
       match.strzaly1,
       match.strzaly2,
       match.strzalyCelne1,
       match.strzalyCelne2,
       match.zolteKartki1,
       match.zolteKartki2
-    ),
-    p1_surowe: probsRaw.p1_surowe,
-    px_surowe: probsRaw.px_surowe,
-    p2_surowe: probsRaw.p2_surowe,
-  } : null;
-
-  // Obliczenia EV
-  const p1_final = fairProbs?.p1 || 0;
-  const px_final = fairProbs?.px || 0;
-  const p2_final = fairProbs?.p2 || 0;
-  
-  const evBets = (match && fairProbs) ? oblicz_wartosci_zakladow(
-    match.kurs1,
-    match.kurs_x,
-    match.kurs2,
-    p1_final,
-    px_final,
-    p2_final
-  ) : [];
-
-  const stats = (match && fairProbs) ? pobierz_i_opisz_staty(
-    match.gospodarz,
-    match.gosc,
-    match.gole1,
-    match.gole2,
-    match.minuta,
-    fairProbs.p1,
-    fairProbs.px,
-    fairProbs.p2,
-    match.strzaly1,
-    match.strzaly2,
-    match.strzalyCelne1,
-    match.strzalyCelne2,
-    match.zolteKartki1,
-    match.zolteKartki2
-  ) : null;
+    );
+  }, [match, fairProbs]);
 
   // Znajdujemy najlepszy bet o dodatnim EV
-  const positiveBets = evBets.filter(b => b.isPositive);
-  const bestEvBet = positiveBets.length > 0 
-    ? positiveBets.reduce((prev, current) => (prev.ev > current.ev ? prev : current)) 
-    : null;
+  const bestEvBet = useMemo(() => {
+    const positiveBets = evBets.filter(b => b.isPositive);
+    return positiveBets.length > 0 
+      ? positiveBets.reduce((prev, current) => (prev.ev > current.ev ? prev : current)) 
+      : null;
+  }, [evBets]);
 
-  const pred = (match && fairProbs && stats) ? przewiduj_kierunek(
-    match.gospodarz,
-    match.gosc,
-    match.gole1,
-    match.gole2,
-    match.minuta,
-    fairProbs.p1,
-    fairProbs.px,
-    fairProbs.p2,
-    stats
-  ) : null;
+  const pred = useMemo(() => {
+    if (!match || !fairProbs || !stats) return null;
+    return przewiduj_kierunek(
+      match.gospodarz,
+      match.gosc,
+      match.gole1,
+      match.gole2,
+      match.minuta,
+      fairProbs.p1,
+      fairProbs.px,
+      fairProbs.p2,
+      stats
+    );
+  }, [match, fairProbs, stats]);
 
   // Pobieranie rekomendacji matematycznej (najwyższe EV, fallback na najwyższe prawdopodobieństwo)
   const getRecommendation = (): ValueBet | null => {

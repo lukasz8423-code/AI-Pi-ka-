@@ -296,6 +296,11 @@ export default function App() {
         }
       }
 
+      // Ograniczamy historię kursów do ostatnich 80 wpisów (ochrona pamięci i localStorage)
+      if (newHistory.length > 80) {
+        newHistory = newHistory.slice(-80);
+      }
+
       return {
         ...updatedMatch,
         oddsHistory: newHistory
